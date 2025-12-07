@@ -1,5 +1,5 @@
 {
-    "io.github.jl95terceira:batteries":{
-        "url":"https://github.com/jl95terceira/batteries-java.git"
+    "jl95terceira:net-io":{
+        "url":"https://github.com/jl95terceira/net-io.git"
     }
 }
