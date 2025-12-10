@@ -92,8 +92,7 @@ public class TestSwitchingIo {
             return "";
         }).await();
         try {
-            var options = new RequesterIf.SendOptions.Editable();
-            requester.apply("second (to time out)", options).get(timeout, TimeUnit.MILLISECONDS);
+            requester.apply("second (to time out)").get(timeout, TimeUnit.MILLISECONDS);
             org.junit.Assert.fail("response timeout exception must be raised");
         }
         catch (TimeoutException ex) {/* as expected */}
