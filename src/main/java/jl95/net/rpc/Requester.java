@@ -4,11 +4,10 @@ import static jl95.lang.SuperPowers.uncheck;
 
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.UUID;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.*;
 
 import javax.json.JsonValue;
 
@@ -20,19 +19,8 @@ import jl95.net.io.managed.ManagedIos;
 import jl95.net.rpc.util.Request;
 import jl95.net.rpc.util.Response;
 import jl95.net.rpc.util.SerdesDefaults;
-import jl95.util.*;
 
 public class Requester implements RequesterIf<JsonValue, JsonValue> {
-
-    private enum         ResponseExceptionalStatus {
-        FAIL_TIMEOUT;
-    }
-    private static class ResponseStatusAndData {
-        public ResponseExceptionalStatus status   = null;
-        public Response response;
-    }
-
-    public static class ResponseTimeoutException extends RuntimeException {}
 
     public static Requester fromSr(SenderReceiverIf<byte[], byte[]> sr) {;
         return new Requester(sr.getSender()  .adaptedSender  (SerdesDefaults.requestToBytes),
@@ -49,70 +37,47 @@ public class Requester implements RequesterIf<JsonValue, JsonValue> {
 
     private final SenderIf  <Request>      sender;
     private final ReceiverIf<Response>     receiver;
-    private final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
+    private final Map<UUID, CompletableFuture<JsonValue>> responseFuturesMap;
 
     private Requester(SenderIf  <Request>  sender,
-                      ReceiverIf<Response> receiver) {this.sender = sender; this.receiver = receiver;}
+                      ReceiverIf<Response> receiver,
+                      int nrOfResponsesToWaitMax) {
+        this.sender = sender;
+        this.receiver = receiver;
+        this.responseFuturesMap = new LinkedHashMap<>() {
+            @Override public boolean removeEldestEntry(Map.Entry<UUID ,CompletableFuture<JsonValue>> eldestEntry) {
+                return size() > nrOfResponsesToWaitMax;
+            }
+        };
+    }
+    private Requester(SenderIf  <Request>  sender,
+                      ReceiverIf<Response> receiver) {
+        this(sender, receiver, 42);
+    }
+
+    private void startReceiving() {
+        receiver.recvWhile(response -> {
+            if (responseFuturesMap.containsKey(response.requestId)) {
+                responseFuturesMap.get(response.requestId).complete(response.payload);
+                responseFuturesMap.remove(response.requestId);
+            }
+            return !responseFuturesMap.isEmpty();
+        });
+    }
 
     @Override
-    synchronized public final JsonValue apply(JsonValue payload, SendOptions options) {
+    synchronized public final Future<JsonValue> apply(JsonValue payload) {
 
         var request     = new Request();
         request.id      = UUID.randomUUID();
         request.payload = payload;
-        var responseFuture = new CompletableFuture<ResponseStatusAndData>();
-        while (true) {
-            sender.send(request);
-            var responseSync = new Object();
-            var ioErrorFuture  = new CompletableFuture<Boolean>();
-            receiver.recvWhile(response -> {
-                synchronized (responseSync) {
-                    if (responseFuture.isDone()) /* oof, just timed out */ {
-                        ioErrorFuture.complete(false);
-                        return false;
-                    }
-                    try {
-                        var rsd = new ResponseStatusAndData();
-                        if (!response.requestId.equals(request.id)) {
-                            options.onOutOfSync();
-                            return true; // discard response (old, out of sync), wait for next
-                        }
-                        else {
-                            rsd.response = response;
-                        }
-                        responseFuture.complete(rsd);
-                        ioErrorFuture.complete(false);
-                        return false;
-                    }
-                    catch (Exception ex) {
-                        ioErrorFuture.complete(true);
-                        return false;
-                    }
-                }
-            });
-            scheduler.schedule(() -> {
-                synchronized (responseSync) {
-                    if (responseFuture.isDone()) return;
-                    // not completed - set failed (by time-out)
-                    receiver.recvStop().await();
-                    var rsd = new ResponseStatusAndData();
-                    rsd.status = ResponseExceptionalStatus.FAIL_TIMEOUT;
-                    responseFuture.complete(rsd);
-                    ioErrorFuture.complete(false);
-                }
-            }, options.getResponseTimeoutMs(), TimeUnit.MILLISECONDS);
-            var ioErrorOccurred = uncheck(() -> ioErrorFuture.get());
-            if (!ioErrorOccurred) {
-                break;
-            }
-            // if error occurred, retry send request and receive response
+        var responseFuture = new CompletableFuture<JsonValue>();
+        responseFuturesMap.put(request.id, responseFuture);
+        sender.send(request);
+        if (!receiver.isReceiving()) {
+            startReceiving();
         }
-        var rsd = uncheck(() -> responseFuture.get());
-        if (rsd.status == ResponseExceptionalStatus.FAIL_TIMEOUT) {
-            throw new ResponseTimeoutException();
-        }
-        receiver.ensureStopped(); // to prevent races between consecutive requests (could cause illegal receiver state exceptions)
-        return rsd.response.payload;
+        return responseFuture;
     }
 
     @Override

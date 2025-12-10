@@ -4,6 +4,9 @@ import static jl95.lang.SuperPowers.self;
 import static jl95.lang.SuperPowers.sleep;
 
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 import jl95.net.io.CloseableIos;
 import jl95.net.rpc.collections.RequesterAdaptersCollection;
@@ -42,16 +45,16 @@ public class TestTypeSwitched {
     }
 
     @org.junit.Test
-    public void test() {
+    public void test() throws ExecutionException, InterruptedException, TimeoutException {
         responder.addCase("hello"  , msg -> "hello, " + msg);
         responder.addCase("bye"    , msg -> "bye, "   + msg);
         responder.adapted(Integer::parseInt, Object::toString).addCase("answer" , i -> i.equals(42));
         responder.start().await();
-        org.junit.Assert.assertEquals("hello, world", requester.getFunction("hello").apply("world"));
+        org.junit.Assert.assertEquals("hello, world", requester.getFunction("hello").apply("world").get(5, TimeUnit.SECONDS));
         var intRequester = requester.adapted((Integer i) -> i.toString(), Boolean::parseBoolean);
-        org.junit.Assert.assertEquals(Boolean.FALSE , intRequester.getFunction("answer").apply(100));
-        org.junit.Assert.assertEquals(Boolean.TRUE  , intRequester.getFunction("answer").apply(42));
-        org.junit.Assert.assertEquals("bye, world"  , requester.getFunction("bye").apply("world"));
+        org.junit.Assert.assertEquals(Boolean.FALSE , intRequester.getFunction("answer").apply(100).get(5, TimeUnit.SECONDS));
+        org.junit.Assert.assertEquals(Boolean.TRUE  , intRequester.getFunction("answer").apply(42).get(5, TimeUnit.SECONDS));
+        org.junit.Assert.assertEquals("bye, world"  , requester.getFunction("bye").apply("world").get(5, TimeUnit.SECONDS));
     }
     @org.junit.Test
     public void testStartStop() {

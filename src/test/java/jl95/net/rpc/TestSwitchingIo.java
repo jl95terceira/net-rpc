@@ -7,12 +7,16 @@ import static jl95.lang.SuperPowers.sleep;
 
 import java.net.InetSocketAddress;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 import jl95.net.io.CloseableIos;
 import jl95.net.io.managed.SwitchingRetriableClientIos;
 import jl95.net.io.managed.SwitchingRetriableIos;
 import jl95.net.rpc.collections.RequesterAdaptersCollection;
 import jl95.net.rpc.collections.ResponderAdaptersCollection;
+import org.junit.rules.Timeout;
 
 public class TestSwitchingIo {
 
@@ -68,20 +72,20 @@ public class TestSwitchingIo {
         responder1.stop ()             .await();
     }
     @org.junit.Test
-    public void test() {
+    public void test() throws ExecutionException, InterruptedException, TimeoutException {
         responder1.respond(msg -> "hello, " + msg).await();
-        org.junit.Assert.assertEquals("hello, world", requester.apply("world"));
+        org.junit.Assert.assertEquals("hello, world", requester.apply("world").get(5, TimeUnit.SECONDS));
     }
     @org.junit.Test
-    public void test2() { // to confirm that the server socket is closed correctly (in tearDown) - otherwise, an address binding error will happen
+    public void test2() throws ExecutionException, InterruptedException, TimeoutException { // to confirm that the server socket is closed correctly (in tearDown) - otherwise, an address binding error will happen
         responder1.respond(msg -> "greetings, " + msg).await();
-        org.junit.Assert.assertEquals("greetings, universe", requester.apply("universe"));
+        org.junit.Assert.assertEquals("greetings, universe", requester.apply("universe").get(5, TimeUnit.SECONDS));
     }
     @org.junit.Test
-    public void testTimeout() {
+    public void testTimeout() throws ExecutionException, InterruptedException, TimeoutException {
         var timeout = 1000;
         responder1.respond(self::apply).await();
-        org.junit.Assert.assertEquals("first", requester.apply("first"));
+        org.junit.Assert.assertEquals("first", requester.apply("first").get(5, TimeUnit.SECONDS));
         responder1.stop().await();
         responder1.respond(msg -> {
             sleep(timeout + 500);
@@ -89,13 +93,12 @@ public class TestSwitchingIo {
         }).await();
         try {
             var options = new RequesterIf.SendOptions.Editable();
-            options.responseTimeoutMs = constant(timeout);
-            requester.apply("second (to time out)", options);
+            requester.apply("second (to time out)", options).get(timeout, TimeUnit.MILLISECONDS);
             org.junit.Assert.fail("response timeout exception must be raised");
         }
-        catch (Requester.ResponseTimeoutException ex) {/* as expected */}
+        catch (TimeoutException ex) {/* as expected */}
         responder1.stop ()           .await();
         responder1.respond(self::apply).await();
-        org.junit.Assert.assertEquals("third", requester.apply("third"));
+        org.junit.Assert.assertEquals("third", requester.apply("third").get(5, TimeUnit.SECONDS));
     }
 }
