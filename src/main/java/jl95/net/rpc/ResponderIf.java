@@ -16,32 +16,32 @@ public interface ResponderIf<A, R> {
         static RespondOptions defaults() { return new Editable(); }
     }
 
-    VoidAwaitable respondWhile(Function1<Tuple2<R, Boolean>, A> responseFunction,
+    UVoidFuture respondWhile(Function1<Tuple2<R, Boolean>, A> responseFunction,
                                  RespondOptions                   options);
-    VoidAwaitable stop        ();
+    UVoidFuture stop        ();
     Boolean       isRunning   ();
 
-    default VoidAwaitable respondWhile(Function1<Tuple2<R, Boolean>, A> responseFunction) {
+    default UVoidFuture respondWhile(Function1<Tuple2<R, Boolean>, A> responseFunction) {
 
         return respondWhile(responseFunction, RespondOptions.defaults());
     }
-    default VoidAwaitable respond     (Function1<R, A> responseFunction,
+    default UVoidFuture respond     (Function1<R, A> responseFunction,
                                          RespondOptions options) {
         return respondWhile(request -> tuple(responseFunction.apply(request), true), options);
     }
-    default VoidAwaitable respond     (Function1<R, A> responseFunction) {
+    default UVoidFuture respond     (Function1<R, A> responseFunction) {
         return respond(responseFunction, RespondOptions.defaults());
     }
-    default VoidAwaitable respondOnce (Function1<R, A> responseFunction,
+    default UVoidFuture respondOnce (Function1<R, A> responseFunction,
                                          RespondOptions options) {
         return respondWhile(request -> tuple(responseFunction.apply(request), false), options);
     }
-    default VoidAwaitable respondOnce (Function1<R, A> responseFunction) {
+    default UVoidFuture respondOnce (Function1<R, A> responseFunction) {
         return respondOnce(responseFunction, RespondOptions.defaults());
     }
     default void          ensureStopped() {
         try {
-            stop().await();
+            stop().get();
         }
         catch (Responder.StopWhenNotRunningException ex) {
             return;
@@ -51,7 +51,7 @@ public interface ResponderIf<A, R> {
                                                          Function1<R, R2> responseAdapter) {
         return new ResponderIf<>() {
 
-            @Override public VoidAwaitable respondWhile(Function1<Tuple2<R2, Boolean>, A2> responseFunction,
+            @Override public UVoidFuture respondWhile(Function1<Tuple2<R2, Boolean>, A2> responseFunction,
                                                           RespondOptions                     options) {
                 return ResponderIf.this.respondWhile(request -> {
                     var adaptedRequest = requestAdapter.apply(request);
@@ -59,7 +59,7 @@ public interface ResponderIf<A, R> {
                     return tuple(responseAdapter.apply(response.a1), response.a2);
                 }, options);
             }
-            @Override public VoidAwaitable stop        () {
+            @Override public UVoidFuture stop        () {
                 return ResponderIf.this.stop();
             }
             @Override public Boolean         isRunning   () {

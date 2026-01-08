@@ -66,38 +66,38 @@ public class TestSwitchingIo {
 
     @org.junit.Test
     public void testStartStop() {
-        responder1.respond(self::apply).await();
-        responder1.stop ()             .await();
-        responder1.respond(self::apply).await();
-        responder1.stop ()             .await();
+        responder1.respond(self::apply).get();
+        responder1.stop ()             .get();
+        responder1.respond(self::apply).get();
+        responder1.stop ()             .get();
     }
     @org.junit.Test
     public void test() throws ExecutionException, InterruptedException, TimeoutException {
-        responder1.respond(msg -> "hello, " + msg).await();
+        responder1.respond(msg -> "hello, " + msg).get();
         org.junit.Assert.assertEquals("hello, world", requester.apply("world").get(5, TimeUnit.SECONDS));
     }
     @org.junit.Test
     public void test2() throws ExecutionException, InterruptedException, TimeoutException { // to confirm that the server socket is closed correctly (in tearDown) - otherwise, an address binding error will happen
-        responder1.respond(msg -> "greetings, " + msg).await();
+        responder1.respond(msg -> "greetings, " + msg).get();
         org.junit.Assert.assertEquals("greetings, universe", requester.apply("universe").get(5, TimeUnit.SECONDS));
     }
     @org.junit.Test
     public void testTimeout() throws ExecutionException, InterruptedException, TimeoutException {
         var timeout = 1000;
-        responder1.respond(self::apply).await();
+        responder1.respond(self::apply).get();
         org.junit.Assert.assertEquals("first", requester.apply("first").get(5, TimeUnit.SECONDS));
-        responder1.stop().await();
+        responder1.stop().get();
         responder1.respond(msg -> {
             sleep(timeout + 500);
             return "";
-        }).await();
+        }).get();
         try {
             requester.apply("second (to time out)").get(timeout, TimeUnit.MILLISECONDS);
             org.junit.Assert.fail("response timeout exception must be raised");
         }
         catch (TimeoutException ex) {/* as expected */}
-        responder1.stop ()           .await();
-        responder1.respond(self::apply).await();
+        responder1.stop ()           .get();
+        responder1.respond(self::apply).get();
         org.junit.Assert.assertEquals("third", requester.apply("third").get(5, TimeUnit.SECONDS));
     }
 }

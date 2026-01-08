@@ -39,7 +39,7 @@ public class TestTypeSwitched {
     }
     @org.junit.After
     public void tearDown() {
-        if (responder.isRunning()) responder.stop().await();
+        if (responder.isRunning()) responder.stop().get();
         if (ioAsClient != null) ioAsClient.close();
         if (ioAsServer != null) ioAsServer.close();
     }
@@ -49,7 +49,7 @@ public class TestTypeSwitched {
         responder.addCase("hello"  , msg -> "hello, " + msg);
         responder.addCase("bye"    , msg -> "bye, "   + msg);
         responder.adapted(Integer::parseInt, Object::toString).addCase("answer" , i -> i.equals(42));
-        responder.start().await();
+        responder.start().get();
         org.junit.Assert.assertEquals("hello, world", requester.getFunction("hello").apply("world").get(5, TimeUnit.SECONDS));
         var intRequester = requester.adapted((Integer i) -> i.toString(), Boolean::parseBoolean);
         org.junit.Assert.assertEquals(Boolean.FALSE , intRequester.getFunction("answer").apply(100).get(5, TimeUnit.SECONDS));
@@ -59,11 +59,11 @@ public class TestTypeSwitched {
     @org.junit.Test
     public void testStartStop() {
         org.junit.Assert.assertFalse(responder.isRunning());
-        responder.start().await();
+        responder.start().get();
         org.junit.Assert.assertTrue (responder.isRunning());
-        responder.stop().await();
+        responder.stop().get();
         org.junit.Assert.assertFalse(responder.isRunning());
-        responder.start().await();
+        responder.start().get();
         org.junit.Assert.assertTrue (responder.isRunning());
     }
 }

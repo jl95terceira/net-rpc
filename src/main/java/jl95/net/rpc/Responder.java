@@ -48,7 +48,7 @@ public class Responder implements ResponderIf<JsonValue, JsonValue> {
     }
 
     @Override
-    synchronized public VoidAwaitable respondWhile(Function1<Tuple2<JsonValue, Boolean>, JsonValue> responseFunction,
+    synchronized public UVoidFuture respondWhile(Function1<Tuple2<JsonValue, Boolean>, JsonValue> responseFunction,
                                                      RespondOptions options) {
 
         if (isRunning()) {
@@ -72,7 +72,7 @@ public class Responder implements ResponderIf<JsonValue, JsonValue> {
         }, options);
     }
     @Override
-    synchronized public VoidAwaitable stop() {
+    synchronized public UVoidFuture stop() {
 
         if (!isRunning()) throw new StopWhenNotRunningException();
         return receiver.recvStop();

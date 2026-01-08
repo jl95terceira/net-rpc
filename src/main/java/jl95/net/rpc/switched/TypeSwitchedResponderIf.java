@@ -15,8 +15,8 @@ public interface TypeSwitchedResponderIf<ABase, RBase> {
                                    Function1<Tuple2<RBase, Boolean>, ABase> responseFunction);
     void            removeCase    (String typeAlias);
     void            setDefaultCase(Function1<Tuple2<RBase, Boolean>, ABase> responseFunction);
-    VoidAwaitable   start         ();
-    VoidAwaitable   stop          ();
+    UVoidFuture   start         ();
+    UVoidFuture   stop          ();
     Boolean         isRunning     ();
     ResponderIf<TypedPayload, TypedPayload> getBaseResponder();
 
@@ -55,12 +55,12 @@ public interface TypeSwitchedResponderIf<ABase, RBase> {
                 }); }
 
             @Override
-            public VoidAwaitable start() {
+            public UVoidFuture start() {
                 return TypeSwitchedResponderIf.this.start();
             }
 
             @Override
-            public VoidAwaitable stop() {
+            public UVoidFuture stop() {
                 return TypeSwitchedResponderIf.this.stop();
             }
 

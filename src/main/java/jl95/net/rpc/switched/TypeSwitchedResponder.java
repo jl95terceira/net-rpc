@@ -64,7 +64,7 @@ public class TypeSwitchedResponder implements TypeSwitchedResponderIf<JsonValue,
         callbacksCases.remove(typeAlias);
     }
     @Override
-    public final VoidAwaitable   start     () {
+    public final UVoidFuture   start     () {
 
         return responder.respondWhile(tp -> {
             var callback = callbacksCases.getOrDefault(tp.typeAlias, callbacksDefault);
@@ -72,7 +72,7 @@ public class TypeSwitchedResponder implements TypeSwitchedResponderIf<JsonValue,
         });
     }
     @Override
-    public final VoidAwaitable   stop      () {
+    public final UVoidFuture   stop      () {
 
         return responder.stop();
     }
