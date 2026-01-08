@@ -17,7 +17,7 @@
             <scope>test</scope>
         </dependency>
         <dependency>
-            <groupId>io.github.jl95terceira</groupId>
+            <groupId>jl95terceira</groupId>
             <artifactId>batteries</artifactId>
             <version>0.21.0</version>
         </dependency>
