@@ -48,10 +48,10 @@ public class TestTypeSwitched {
     public void test() throws ExecutionException, InterruptedException, TimeoutException {
         responder.addCase("hello"  , msg -> "hello, " + msg + "!");
         responder.addCase("bye"    , msg -> "bye, "   + msg + "...");
-        responder.adapted(Integer::parseInt, Object::toString).addCase("answer" , i -> i.equals(42));
+        responder.adapted(Integer::parseInt, (Boolean b) -> Boolean.toString(b)).addCase("answer" , i -> i.equals(42));
         responder.start().get();
         org.junit.Assert.assertEquals("hello, world!", requester.getFunction("hello").apply("world").get(5, TimeUnit.SECONDS));
-        var intRequester = requester.adapted((Integer i) -> i.toString(), Boolean::parseBoolean);
+        var intRequester = requester.adapted((Integer i) -> Integer.toString(i), Boolean::parseBoolean);
         org.junit.Assert.assertEquals(Boolean.FALSE , intRequester.getFunction("answer").apply(100).get(5, TimeUnit.SECONDS));
         org.junit.Assert.assertEquals(Boolean.TRUE  , intRequester.getFunction("answer").apply(42).get(5, TimeUnit.SECONDS));
         org.junit.Assert.assertEquals("bye, world..."  , requester.getFunction("bye").apply("world").get(5, TimeUnit.SECONDS));
