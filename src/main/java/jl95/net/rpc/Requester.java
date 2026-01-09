@@ -52,7 +52,7 @@ public class Requester implements RequesterIf<JsonValue, JsonValue> {
     }
     private Requester(SenderIf  <Request>  sender,
                       ReceiverIf<Response> receiver) {
-        this(sender, receiver, 42);
+        this(sender, receiver, 10);
     }
 
     private void startReceiving() {
