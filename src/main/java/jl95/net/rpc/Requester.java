@@ -19,6 +19,7 @@ import jl95.net.io.managed.ManagedIos;
 import jl95.net.rpc.util.Request;
 import jl95.net.rpc.util.Response;
 import jl95.net.rpc.util.SerdesDefaults;
+import jl95.util.UVoidFuture;
 
 public class Requester implements RequesterIf<JsonValue, JsonValue> {
 
@@ -35,8 +36,9 @@ public class Requester implements RequesterIf<JsonValue, JsonValue> {
         return fromSr(SenderReceiverIf.fromManagedIo(ios));
     }
 
-    private final SenderIf  <Request>      sender;
-    private final ReceiverIf<Response>     receiver;
+    private final SenderIf  <Request>  sender;
+    private final ReceiverIf<Response> receiver;
+    private final ThreadPoolExecutor   receiverTpe = new ScheduledThreadPoolExecutor(1);
     private final Map<UUID, CompletableFuture<JsonValue>> responseFuturesMap;
 
     private Requester(SenderIf  <Request>  sender,
@@ -55,14 +57,15 @@ public class Requester implements RequesterIf<JsonValue, JsonValue> {
         this(sender, receiver, 10);
     }
 
-    private void startReceiving() {
-        receiver.recvWhile(response -> {
+    private UVoidFuture startReceiving() {
+        receiverTpe.execute(() -> receiver.recvWhile(response -> {
             if (responseFuturesMap.containsKey(response.requestId)) {
                 responseFuturesMap.get(response.requestId).complete(response.payload);
                 responseFuturesMap.remove(response.requestId);
             }
             return !responseFuturesMap.isEmpty();
-        });
+        }));
+        return receiver.recvWaitStarted();
     }
 
     @Override
@@ -75,7 +78,7 @@ public class Requester implements RequesterIf<JsonValue, JsonValue> {
         responseFuturesMap.put(request.id, responseFuture);
         sender.send(request);
         if (!receiver.isReceiving()) {
-            startReceiving();
+            startReceiving().get();
         }
         return responseFuture;
     }

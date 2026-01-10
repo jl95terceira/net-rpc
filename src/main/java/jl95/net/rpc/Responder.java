@@ -1,6 +1,8 @@
 package jl95.net.rpc;
 
 import java.util.UUID;
+import java.util.concurrent.ScheduledThreadPoolExecutor;
+import java.util.concurrent.ThreadPoolExecutor;
 
 import javax.json.JsonValue;
 
@@ -39,6 +41,7 @@ public class Responder implements ResponderIf<JsonValue, JsonValue> {
     }
 
     private final ReceiverIf<Request>  receiver;
+    private final ThreadPoolExecutor   receiverTpe = new ScheduledThreadPoolExecutor(1);
     private final SenderIf  <Response> sender;
 
     private Responder(ReceiverIf<Request>  receiver,
@@ -54,8 +57,7 @@ public class Responder implements ResponderIf<JsonValue, JsonValue> {
         if (isRunning()) {
             throw new StartWhenAlreadyRunningException();
         }
-        return receiver.recvWhile(request -> {
-
+        receiverTpe.execute(() -> receiver.recvWhile(request -> {
             var requestObject  = request.payload;
             var responseObject = responseFunction.apply(requestObject);
             var response       = new Response();
@@ -69,7 +71,8 @@ public class Responder implements ResponderIf<JsonValue, JsonValue> {
                 return true; // continue receiving
             }
             return responseObject.a2;
-        }, options);
+        }, options));
+        return receiver.recvWaitStarted();
     }
     @Override
     synchronized public UVoidFuture stop() {
