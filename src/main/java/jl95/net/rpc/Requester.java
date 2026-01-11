@@ -1,5 +1,6 @@
 package jl95.net.rpc;
 
+import static jl95.lang.SuperPowers.strict;
 import static jl95.lang.SuperPowers.uncheck;
 
 import java.io.InputStream;
@@ -19,14 +20,17 @@ import jl95.net.io.managed.ManagedIos;
 import jl95.net.rpc.util.Request;
 import jl95.net.rpc.util.Response;
 import jl95.net.rpc.util.SerdesDefaults;
+import jl95.serdes.StringFromBytes;
+import jl95.serdes.StringUTF8FromBytes;
+import jl95.serdes.StringUTF8ToBytes;
+import jl95.util.StrictMap;
 import jl95.util.UFuture;
 import jl95.util.UVoidFuture;
 
-public class Requester implements RequesterIf<JsonValue, JsonValue> {
+public class Requester implements RequesterIf<byte[], byte[]> {
 
     public static Requester fromSr(SenderReceiverIf<byte[], byte[]> sr) {;
-        return new Requester(sr.getSender()  .adaptedSender  (SerdesDefaults.requestToBytes),
-                             sr.getReceiver().adaptedReceiver(SerdesDefaults.responseFromBytes));
+        return new Requester(sr.getSender(), sr.getReceiver());
     }
     public static Requester fromIo(Ios ios) {
 
@@ -37,32 +41,40 @@ public class Requester implements RequesterIf<JsonValue, JsonValue> {
         return fromSr(SenderReceiverIf.fromManagedIo(ios));
     }
 
-    private final SenderIf  <Request>  sender;
-    private final ReceiverIf<Response> receiver;
+    private final SenderIf  <byte[]>  sender;
+    private final ReceiverIf<byte[]> receiver;
     private final ThreadPoolExecutor   receiverTpe = new ScheduledThreadPoolExecutor(1);
-    private final Map<UUID, CompletableFuture<JsonValue>> responseFuturesMap;
+    private final StrictMap<String, CompletableFuture<byte[]>> responseFuturesMap;
 
-    private Requester(SenderIf  <Request>  sender,
-                      ReceiverIf<Response> receiver,
+    private Requester(SenderIf  <byte[]>  sender,
+                      ReceiverIf<byte[]> receiver,
                       int nrOfResponsesToWaitMax) {
         this.sender = sender;
         this.receiver = receiver;
-        this.responseFuturesMap = new LinkedHashMap<>() {
-            @Override public boolean removeEldestEntry(Map.Entry<UUID ,CompletableFuture<JsonValue>> eldestEntry) {
+        this.responseFuturesMap = strict(new LinkedHashMap<>() {
+            @Override public boolean removeEldestEntry(Map.Entry<String ,CompletableFuture<byte[]>> eldestEntry) {
                 return size() > nrOfResponsesToWaitMax;
             }
-        };
+        });
     }
-    private Requester(SenderIf  <Request>  sender,
-                      ReceiverIf<Response> receiver) {
+    private Requester(SenderIf  <byte[]>  sender,
+                      ReceiverIf<byte[]> receiver) {
         this(sender, receiver, 10);
     }
 
     private UVoidFuture startReceiving() {
         receiverTpe.execute(() -> receiver.recvWhile(response -> {
-            if (responseFuturesMap.containsKey(response.requestId)) {
-                responseFuturesMap.get(response.requestId).complete(response.payload);
-                responseFuturesMap.remove(response.requestId);
+            //var idAsBytes = new byte[36];
+            //var id = StringUTF8FromBytes.get().apply(idAsBytes);
+            var requestIdAsBytes = new byte[36];
+            var payload = new byte[response.length-72];
+            //System.arraycopy(response,  0, idAsBytes,        0,                 36);
+            System.arraycopy(response, 36, requestIdAsBytes, 0,                 36);
+            System.arraycopy(response, 72, payload,          0, response.length-72);
+            var requestId = StringUTF8FromBytes.get().apply(requestIdAsBytes);
+            if (responseFuturesMap.containsKey(requestId)) {
+                responseFuturesMap.get(requestId).complete(payload);
+                responseFuturesMap.remove(requestId);
             }
             return !responseFuturesMap.isEmpty();
         }));
@@ -70,13 +82,15 @@ public class Requester implements RequesterIf<JsonValue, JsonValue> {
     }
 
     @Override
-    synchronized public final UFuture<JsonValue> apply(JsonValue payload) {
+    synchronized public final UFuture<byte[]> apply(byte[] payload) {
 
-        var request     = new Request();
-        request.id      = UUID.randomUUID();
-        request.payload = payload;
-        var responseFuture = new CompletableFuture<JsonValue>();
-        responseFuturesMap.put(request.id, responseFuture);
+        var requestId = UUID.randomUUID().toString();
+        var responseFuture = new CompletableFuture<byte[]>();
+        responseFuturesMap.put(requestId, responseFuture);
+        var request = new byte[36+payload.length];
+        var requestIdAsBytes = StringUTF8ToBytes.get().apply(requestId);
+        System.arraycopy(requestIdAsBytes, 0, request,  0, requestIdAsBytes.length);
+        System.arraycopy(payload,          0, request, 36, payload         .length);
         sender.send(request);
         if (!receiver.isReceiving()) {
             startReceiving().get();
