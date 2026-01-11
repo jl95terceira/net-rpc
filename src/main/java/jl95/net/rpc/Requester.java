@@ -1,7 +1,6 @@
 package jl95.net.rpc;
 
 import static jl95.lang.SuperPowers.strict;
-import static jl95.lang.SuperPowers.uncheck;
 
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -10,17 +9,11 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.*;
 
-import javax.json.JsonValue;
-
 import jl95.net.io.Ios;
 import jl95.net.io.ReceiverIf;
 import jl95.net.io.SenderIf;
 import jl95.net.io.SenderReceiverIf;
 import jl95.net.io.managed.ManagedIos;
-import jl95.net.rpc.util.Request;
-import jl95.net.rpc.util.Response;
-import jl95.net.rpc.util.SerdesDefaults;
-import jl95.serdes.StringFromBytes;
 import jl95.serdes.StringUTF8FromBytes;
 import jl95.serdes.StringUTF8ToBytes;
 import jl95.util.StrictMap;
