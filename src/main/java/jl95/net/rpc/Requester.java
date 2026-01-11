@@ -19,6 +19,7 @@ import jl95.net.io.managed.ManagedIos;
 import jl95.net.rpc.util.Request;
 import jl95.net.rpc.util.Response;
 import jl95.net.rpc.util.SerdesDefaults;
+import jl95.util.UFuture;
 import jl95.util.UVoidFuture;
 
 public class Requester implements RequesterIf<JsonValue, JsonValue> {
@@ -69,7 +70,7 @@ public class Requester implements RequesterIf<JsonValue, JsonValue> {
     }
 
     @Override
-    synchronized public final Future<JsonValue> apply(JsonValue payload) {
+    synchronized public final UFuture<JsonValue> apply(JsonValue payload) {
 
         var request     = new Request();
         request.id      = UUID.randomUUID();
@@ -80,7 +81,7 @@ public class Requester implements RequesterIf<JsonValue, JsonValue> {
         if (!receiver.isReceiving()) {
             startReceiving().get();
         }
-        return responseFuture;
+        return UFuture.of(responseFuture);
     }
 
     @Override

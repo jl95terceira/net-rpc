@@ -5,11 +5,11 @@ import static jl95.lang.SuperPowers.self;
 
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.util.concurrent.Future;
 
 import jl95.lang.variadic.*;
+import jl95.util.UFuture;
 
-public interface RequesterIf<A, R> extends Function1<Future<R>,A> {
+public interface RequesterIf<A, R> extends Function1<UFuture<R>,A> {
 
     InputStream  getInputStream ();
     OutputStream getOutputStream();
@@ -18,7 +18,7 @@ public interface RequesterIf<A, R> extends Function1<Future<R>,A> {
                                                          Function1<R2, R> responseAdapter) {
         return new RequesterIf<>() {
 
-            @Override public Future<R2>   apply          (A2 requestObject) {
+            @Override public UFuture<R2>   apply          (A2 requestObject) {
                 var adaptedRequestObject = requestAdapter.apply(requestObject);
                 var responseObject = RequesterIf.this.apply(adaptedRequestObject);
                 return mapped(responseAdapter, responseObject);
