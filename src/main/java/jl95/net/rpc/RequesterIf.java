@@ -9,9 +9,8 @@ import java.util.concurrent.Future;
 
 import jl95.lang.variadic.*;
 
-public interface RequesterIf<A, R> {
+public interface RequesterIf<A, R> extends Function1<Future<R>,A> {
 
-    Future<R> apply(A requestObject);
     InputStream  getInputStream ();
     OutputStream getOutputStream();
 

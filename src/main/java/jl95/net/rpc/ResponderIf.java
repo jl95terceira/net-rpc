@@ -26,20 +26,20 @@ public interface ResponderIf<A, R> {
         return respondWhile(responseFunction, RespondOptions.defaults());
     }
     default UVoidFuture respond     (Function1<R, A> responseFunction,
-                                         RespondOptions options) {
+                                     RespondOptions  options) {
         return respondWhile(request -> tuple(responseFunction.apply(request), true), options);
     }
     default UVoidFuture respond     (Function1<R, A> responseFunction) {
         return respond(responseFunction, RespondOptions.defaults());
     }
     default UVoidFuture respondOnce (Function1<R, A> responseFunction,
-                                         RespondOptions options) {
+                                     RespondOptions  options) {
         return respondWhile(request -> tuple(responseFunction.apply(request), false), options);
     }
     default UVoidFuture respondOnce (Function1<R, A> responseFunction) {
         return respondOnce(responseFunction, RespondOptions.defaults());
     }
-    default void          ensureStopped() {
+    default void        ensureStopped() {
         try {
             stop().get();
         }
