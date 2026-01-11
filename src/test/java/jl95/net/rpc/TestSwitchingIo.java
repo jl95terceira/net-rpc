@@ -16,7 +16,6 @@ import jl95.net.io.managed.SwitchingRetriableClientIos;
 import jl95.net.io.managed.SwitchingRetriableIos;
 import jl95.net.rpc.collections.RequesterAdaptersCollection;
 import jl95.net.rpc.collections.ResponderAdaptersCollection;
-import org.junit.rules.Timeout;
 
 public class TestSwitchingIo {
 
@@ -34,16 +33,16 @@ public class TestSwitchingIo {
     public void setUp() throws Exception {
         var responder1Future = CompletableFuture.supplyAsync(() -> {
             ioAsServer1 = Util.getIoAsServer(addr1);
-            return ResponderAdaptersCollection.asStringPostGetResponder(Responder.fromIo(ioAsServer1));
+            return ResponderAdaptersCollection.asStringResponder(Responder.fromIo(ioAsServer1));
         }, (task) -> new Thread(task).start());
         var responder2Future = CompletableFuture.supplyAsync(() -> {
             ioAsServer2 = Util.getIoAsServer(addr2);
-            return ResponderAdaptersCollection.asStringPostGetResponder(Responder.fromIo(ioAsServer2));
+            return ResponderAdaptersCollection.asStringResponder(Responder.fromIo(ioAsServer2));
         }, (task) -> new Thread(task).start());
         sleep(50);
         var requesterFuture = CompletableFuture.supplyAsync(() -> {
             ioAsClient = SwitchingRetriableClientIos.of(addr1, addr2);
-            return RequesterAdaptersCollection.asStringPostGetRequester(Requester.fromManagedIo(ioAsClient));
+            return RequesterAdaptersCollection.asStringRequester(Requester.fromManagedIo(ioAsClient));
         }, (task) -> new Thread(task).start());
         requester = requesterFuture.get();
         responder1 = responder1Future.get();

@@ -23,12 +23,12 @@ public class Test {
     public void setUp() throws Exception {
         var responderFuture = CompletableFuture.supplyAsync(() -> {
             ioAsServer = Util.getIoAsServer(jl95.net.io.util.Defaults.serverAddr);
-            return ResponderAdaptersCollection.asStringPostGetResponder(Responder.fromIo(ioAsServer));
+            return ResponderAdaptersCollection.asStringResponder(Responder.fromIo(ioAsServer));
         }, (task) -> new Thread(task).start());
         sleep(50);
         var requesterFuture = CompletableFuture.supplyAsync(() -> {
             ioAsClient = Util.getIoAsClient(jl95.net.io.util.Defaults.serverAddr);
-            return RequesterAdaptersCollection.asStringPostGetRequester(Requester.fromIo(ioAsClient));
+            return RequesterAdaptersCollection.asStringRequester(Requester.fromIo(ioAsClient));
         }, (task) -> new Thread(task).start());
         requester = requesterFuture.get();
         responder = responderFuture.get();
