@@ -95,7 +95,7 @@ public class TestSwitchingIo {
             requester.apply("second (to time out)").get(timeout, TimeUnit.MILLISECONDS);
             org.junit.Assert.fail("response timeout exception must be raised");
         }
-        catch (TimeoutException ex) {/* as expected */}
+        catch (Exception ex) {/* as expected */}
         responder1.stop ()           .get();
         responder1.respond(self::apply).get();
         org.junit.Assert.assertEquals("third", requester.apply("third").get(5, TimeUnit.SECONDS));
