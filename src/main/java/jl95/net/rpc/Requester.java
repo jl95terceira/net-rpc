@@ -84,10 +84,10 @@ public class Requester implements RequesterIf<byte[], byte[]> {
         var requestIdAsBytes = StringUTF8ToBytes.get().apply(requestId);
         System.arraycopy(requestIdAsBytes, 0, request,  0, requestIdAsBytes.length);
         System.arraycopy(payload,          0, request, 36, payload         .length);
-        sender.send(request);
         if (!receiver.isReceiving()) {
             startReceiving().get();
         }
+        sender.send(request);
         return UFuture.of(responseFuture);
     }
 
