@@ -20,79 +20,34 @@ import jl95.util.StrictMap;
 import jl95.util.UFuture;
 import jl95.util.UVoidFuture;
 
-public class Requester implements RequesterIf<byte[], byte[]> {
+public class Requester extends GenericRequester<byte[], byte[]> {
 
-    public static Requester fromSr(SenderReceiverIf<byte[], byte[]> sr) {;
-        return new Requester(sr.getSender(), sr.getReceiver());
+    public static Requester of(SenderReceiverIf<byte[], byte[]> sr) {
+        return new Requester(sr);
     }
-    public static Requester fromIo(Ios ios) {
-
-        return fromSr(SenderReceiverIf.fromIo(ios));
+    public static Requester of(Ios ios) {
+        return of(SenderReceiverIf.fromIo(ios));
     }
-    public static Requester fromManagedIo(ManagedIos ios) {
-
-        return fromSr(SenderReceiverIf.fromManagedIo(ios));
+    public static Requester of(ManagedIos ios) {
+        return of(SenderReceiverIf.fromManagedIo(ios));
     }
 
-    private final SenderIf  <byte[]>  sender;
-    private final ReceiverIf<byte[]> receiver;
-    private final ThreadPoolExecutor   receiverTpe = new ScheduledThreadPoolExecutor(1);
-    private final StrictMap<String, CompletableFuture<byte[]>> responseFuturesMap;
-
-    private Requester(SenderIf  <byte[]>  sender,
-                      ReceiverIf<byte[]> receiver,
-                      int nrOfResponsesToWaitMax) {
-        this.sender = sender;
-        this.receiver = receiver;
-        this.responseFuturesMap = strict(new LinkedHashMap<>() {
-            @Override public boolean removeEldestEntry(Map.Entry<String ,CompletableFuture<byte[]>> eldestEntry) {
-                return size() > nrOfResponsesToWaitMax;
-            }
-        });
+    public Requester(SenderReceiverIf<byte[],byte[]> sr,
+                     int nrOfResponsesToWaitMax) {
+        super(sr, nrOfResponsesToWaitMax);
     }
-    private Requester(SenderIf  <byte[]>  sender,
-                      ReceiverIf<byte[]> receiver) {
-        this(sender, receiver, 10);
-    }
-
-    private UVoidFuture startReceiving() {
-        receiverTpe.execute(() -> receiver.recvWhile(response -> {
-            //var idAsBytes = new byte[36];
-            //var id = StringUTF8FromBytes.get().apply(idAsBytes);
-            var requestIdAsBytes = new byte[36];
-            var payload = new byte[response.length-72];
-            //System.arraycopy(response,  0, idAsBytes,        0,                 36);
-            System.arraycopy(response, 36, requestIdAsBytes, 0,                 36);
-            System.arraycopy(response, 72, payload,          0, response.length-72);
-            var requestId = StringUTF8FromBytes.get().apply(requestIdAsBytes);
-            if (responseFuturesMap.containsKey(requestId)) {
-                responseFuturesMap.get(requestId).complete(payload);
-                responseFuturesMap.remove(requestId);
-            }
-            return !responseFuturesMap.isEmpty();
-        }));
-        return receiver.recvWaitStarted();
+    public Requester(SenderReceiverIf<byte[],byte[]> sr) {
+        super(sr);
     }
 
     @Override
-    synchronized public final UFuture<byte[]> apply(byte[] payload) {
-
-        var requestId = UUID.randomUUID().toString();
-        var responseFuture = new CompletableFuture<byte[]>();
-        responseFuturesMap.put(requestId, responseFuture);
-        var request = new byte[36+payload.length];
-        var requestIdAsBytes = StringUTF8ToBytes.get().apply(requestId);
-        System.arraycopy(requestIdAsBytes, 0, request,  0, requestIdAsBytes.length);
-        System.arraycopy(payload,          0, request, 36, payload         .length);
-        if (!receiver.isReceiving()) {
-            startReceiving().get();
-        }
-        sender.send(request);
-        return UFuture.of(responseFuture);
+    protected byte[] serialize(byte[] requestData) {
+        return requestData;
     }
 
     @Override
-    public final InputStream  getInputStream () { return receiver.getInputStream (); }
-    @Override
-    public final OutputStream getOutputStream() { return sender  .getOutputStream(); }
+    protected byte[] deserialize(byte[] responseData) {
+        return responseData;
+    }
+
 }
