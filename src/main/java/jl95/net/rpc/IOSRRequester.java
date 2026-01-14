@@ -10,6 +10,7 @@ import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import jl95.lang.variadic.Function1;
 import jl95.net.io.IOStreamSupplier;
@@ -41,16 +42,20 @@ public abstract class IOSRRequester<A,R> implements Requester<A,R> {
     private final Receiver<byte[]> receiver;
     private final ThreadPoolExecutor receiverTpe;
     private final StrictMap<String, CompletableFuture<byte[]>> responseFuturesMap;
+    private final AtomicBoolean autoAcceptResponses;
 
     private IOSRRequester(Sender  <byte[]> sender,
                           Receiver<byte[]> receiver,
                           ThreadPoolExecutor receiverTpe,
-                          StrictMap<String, CompletableFuture<byte[]>> responseFuturesMap) {
+                          StrictMap<String, CompletableFuture<byte[]>> responseFuturesMap,
+                          AtomicBoolean autoAcceptResponses) {
         this.sender = sender;
         this.receiver = receiver;
         this.receiverTpe = receiverTpe;
         this.responseFuturesMap = responseFuturesMap;
+        this.autoAcceptResponses = autoAcceptResponses;
     }
+
     public IOSRRequester(SenderReceiver<byte[],byte[]> sr,
                          int nrOfResponsesToWaitMax) {
         this(sr.getSender(),
@@ -61,7 +66,8 @@ public abstract class IOSRRequester<A,R> implements Requester<A,R> {
                  public boolean removeEldestEntry(Map.Entry<String, CompletableFuture<byte[]>> eldestEntry) {
                      return size() > nrOfResponsesToWaitMax;
                  }
-             }));
+             }),
+             new AtomicBoolean(true));
     }
     public IOSRRequester(SenderReceiver<byte[],byte[]> sr) {
         this(sr, 10);
@@ -78,23 +84,37 @@ public abstract class IOSRRequester<A,R> implements Requester<A,R> {
         this(SenderReceiver.ofConstant(sender, receiver));
     }
 
-    private UVoidFuture startReceiving() {
-        receiverTpe.execute(() -> receiver.recvWhile(response -> {
-            //var idAsBytes = new byte[36];
-            //var id = StringUTF8FromBytes.get().apply(idAsBytes);
-            var requestIdAsBytes = new byte[36];
-            var payload = new byte[response.length-72];
-            //System.arraycopy(response,  0, idAsBytes,        0,                 36);
-            System.arraycopy(response, 36, requestIdAsBytes, 0,                 36);
-            System.arraycopy(response, 72, payload,          0, response.length-72);
-            var requestId = StringUTF8FromBytes.get().apply(requestIdAsBytes);
-            if (responseFuturesMap.containsKey(requestId)) {
-                responseFuturesMap.get(requestId).complete(payload);
-                responseFuturesMap.remove(requestId);
-            }
-            return !responseFuturesMap.isEmpty();
-        }));
-        return receiver.recvWaitStarted();
+    public boolean isAcceptingResponses() {
+        return receiver.isReceiving();
+    }
+    public UVoidFuture acceptResponses(boolean toAccept) {
+        if (toAccept == isAcceptingResponses()) {
+            throw new IllegalStateException();
+        }
+        if (toAccept) {
+            receiverTpe.execute(() -> receiver.recvWhile(response -> {
+                //var idAsBytes = new byte[36];
+                //var id = StringUTF8FromBytes.get().apply(idAsBytes);
+                var requestIdAsBytes = new byte[36];
+                var payload = new byte[response.length-72];
+                //System.arraycopy(response,  0, idAsBytes,        0,                 36);
+                System.arraycopy(response, 36, requestIdAsBytes, 0,                 36);
+                System.arraycopy(response, 72, payload,          0, response.length-72);
+                var requestId = StringUTF8FromBytes.get().apply(requestIdAsBytes);
+                if (responseFuturesMap.containsKey(requestId)) {
+                    responseFuturesMap.get(requestId).complete(payload);
+                    responseFuturesMap.remove(requestId);
+                }
+                return !autoAcceptResponses.get() || !responseFuturesMap.isEmpty();
+            }));
+            return receiver.recvWaitStarted();
+        }
+        else {
+            return receiver.recvStop();
+        }
+    }
+    public void setAutoAcceptResponses(boolean value) {
+        autoAcceptResponses.set(value);
     }
 
     protected abstract byte[] serialize  (A      requestData);
@@ -111,17 +131,17 @@ public abstract class IOSRRequester<A,R> implements Requester<A,R> {
         var requestIdAsBytes = StringUTF8ToBytes.get().apply(requestId);
         System.arraycopy(requestIdAsBytes, 0, request,  0, requestIdAsBytes.length);
         System.arraycopy(payload,          0, request, 36, payload         .length);
-        if (!receiver.isReceiving()) {
-            startReceiving().get();
+        if (autoAcceptResponses.get() && !isAcceptingResponses()) {
+            acceptResponses(true).get();
         }
         sender.send(request);
         return mapped(this::deserialize, UFuture.of(responseFuture));
     }
 
     @Override
-    public <A2, R2> IOSRRequester<A2, R2> adapted        (Function1<A, A2> requestAdapter,
-                                                              Function1<R2, R> responseAdapter) {
-        return new IOSRRequester<>(sender, receiver, receiverTpe, responseFuturesMap) {
+    public <A2, R2> IOSRRequester<A2, R2> adapted(Function1<A, A2> requestAdapter,
+                                                  Function1<R2, R> responseAdapter) {
+        return new IOSRRequester<>(sender, receiver, receiverTpe, responseFuturesMap, autoAcceptResponses) {
             @Override protected byte[] serialize(A2 data) {
                 return IOSRRequester.this.serialize(requestAdapter.apply(data));
             }
