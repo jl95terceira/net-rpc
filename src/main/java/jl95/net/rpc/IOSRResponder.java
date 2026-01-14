@@ -1,7 +1,6 @@
 package jl95.net.rpc;
 
 import static jl95.lang.SuperPowers.self;
-import static jl95.lang.SuperPowers.tuple;
 
 import java.util.UUID;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
@@ -9,49 +8,49 @@ import java.util.concurrent.ThreadPoolExecutor;
 
 import jl95.lang.variadic.Function1;
 import jl95.lang.variadic.Tuple2;
-import jl95.net.io.Ios;
-import jl95.net.io.ReceiverIf;
-import jl95.net.io.SenderIf;
-import jl95.net.io.SenderReceiverIf;
-import jl95.net.io.managed.ManagedIos;
+import jl95.net.io.IOStreamSupplier;
+import jl95.net.io.Receiver;
+import jl95.net.io.Sender;
+import jl95.net.io.SenderReceiver;
+import jl95.net.io.managed.ManagedIOStreamSupplier;
 import jl95.serdes.StringUTF8ToBytes;
 import jl95.util.UVoidFuture;
 
-public abstract class GenericResponder<A,R> implements ResponderIf<A, R> {
+public abstract class IOSRResponder<A,R> implements Responder<A, R> {
 
     public static class StartWhenAlreadyRunningException extends RuntimeException {}
     public static class StopWhenNotRunningException      extends RuntimeException {}
 
-    public static <A,R,C extends GenericResponder<A,R>> C of(Function1<C,SenderReceiverIf<byte[], byte[]>> constructor, SenderReceiverIf<byte[], byte[]> sr) {
+    public static <A, R, C extends IOSRResponder<A, R>> C of(Function1<C, SenderReceiver<byte[], byte[]>> constructor, SenderReceiver<byte[], byte[]> sr) {
         return constructor.apply(sr);
     }
-    public static <A,R,C extends GenericResponder<A,R>> C of(Function1<C,SenderReceiverIf<byte[], byte[]>> constructor, Ios ios) {
+    public static <A, R, C extends IOSRResponder<A, R>> C of(Function1<C, SenderReceiver<byte[], byte[]>> constructor, IOStreamSupplier ios) {
 
-        return of(constructor, SenderReceiverIf.fromIo(ios));
+        return of(constructor, SenderReceiver.fromIo(ios));
     }
-    public static <A,R,C extends GenericResponder<A,R>> C of(Function1<C,SenderReceiverIf<byte[], byte[]>> constructor, ManagedIos ios) {
+    public static <A, R, C extends IOSRResponder<A, R>> C of(Function1<C, SenderReceiver<byte[], byte[]>> constructor, ManagedIOStreamSupplier ios) {
 
-        return of(constructor, SenderReceiverIf.fromManagedIo(ios));
+        return of(constructor, SenderReceiver.fromManagedIo(ios));
     }
 
-    private final ReceiverIf<byte[]> receiver;
+    private final Receiver<byte[]> receiver;
+    private final Sender  <byte[]> sender;
     private final ThreadPoolExecutor receiverTpe;
-    private final SenderIf  <byte[]> sender;
 
-    private GenericResponder(ReceiverIf<byte[]> receiver,
-                             ThreadPoolExecutor receiverTpe,
-                             SenderIf  <byte[]> sender) {
+    private IOSRResponder(Receiver<byte[]> receiver,
+                          ThreadPoolExecutor receiverTpe,
+                          Sender  <byte[]> sender) {
         this.receiver = receiver;
         this.receiverTpe = receiverTpe;
         this.sender   = sender;
     }
-    public GenericResponder(SenderReceiverIf<byte[],byte[]> sr) {
+    public IOSRResponder(SenderReceiver<byte[],byte[]> sr) {
         this(sr.getReceiver(), new ScheduledThreadPoolExecutor(1), sr.getSender());
     }
     @Deprecated
-    public GenericResponder(ReceiverIf<byte[]> receiver,
-                            SenderIf  <byte[]> sender) {
-        this(SenderReceiverIf.ofConstant(sender,receiver));
+    public IOSRResponder(Receiver<byte[]> receiver,
+                         Sender  <byte[]> sender) {
+        this(SenderReceiver.ofConstant(sender,receiver));
     }
 
     protected abstract A      deserialize(byte[] requestData);
@@ -101,22 +100,22 @@ public abstract class GenericResponder<A,R> implements ResponderIf<A, R> {
         return receiver.isReceiving();
     }
 
-    public <A2, R2> ResponderIf<A2, R2> adapted        (Function1<A2, A> requestAdapter,
+    public <A2, R2> Responder<A2, R2> adapted        (Function1<A2, A> requestAdapter,
                                                         Function1<R, R2> responseAdapter) {
-        return new GenericResponder<>(receiver, receiverTpe, sender) {
+        return new IOSRResponder<>(receiver, receiverTpe, sender) {
             @Override protected A2 deserialize(byte[] requestData) {
-                return requestAdapter.apply(GenericResponder.this.deserialize(requestData));
+                return requestAdapter.apply(IOSRResponder.this.deserialize(requestData));
             }
             @Override protected byte[] serialize(R2 responseData) {
-                return GenericResponder.this.serialize(responseAdapter.apply(responseData));
+                return IOSRResponder.this.serialize(responseAdapter.apply(responseData));
             }
         };
     }
-    public <A2>     ResponderIf<A2, R>  adaptedRequest (Function1<A2, A> requestAdapter) {
+    public <A2> Responder<A2, R> adaptedRequest (Function1<A2, A> requestAdapter) {
 
         return adapted(requestAdapter, self::apply);
     }
-    public <R2>     ResponderIf<A, R2>  adaptedResponse(Function1<R, R2> responseAdapter) {
+    public <R2> Responder<A, R2> adaptedResponse(Function1<R, R2> responseAdapter) {
 
         return adapted(self::apply, responseAdapter);
     }

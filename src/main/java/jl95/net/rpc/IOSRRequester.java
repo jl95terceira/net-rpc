@@ -1,12 +1,9 @@
 package jl95.net.rpc;
 
-import static jl95.lang.SuperPowers.constant;
 import static jl95.lang.SuperPowers.mapped;
 import static jl95.lang.SuperPowers.self;
 import static jl95.lang.SuperPowers.strict;
 
-import java.io.InputStream;
-import java.io.OutputStream;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.UUID;
@@ -15,47 +12,47 @@ import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.ThreadPoolExecutor;
 
 import jl95.lang.variadic.Function1;
-import jl95.net.io.Ios;
-import jl95.net.io.ReceiverIf;
-import jl95.net.io.SenderIf;
-import jl95.net.io.SenderReceiverIf;
-import jl95.net.io.managed.ManagedIos;
+import jl95.net.io.IOStreamSupplier;
+import jl95.net.io.Receiver;
+import jl95.net.io.Sender;
+import jl95.net.io.SenderReceiver;
+import jl95.net.io.managed.ManagedIOStreamSupplier;
 import jl95.serdes.StringUTF8FromBytes;
 import jl95.serdes.StringUTF8ToBytes;
 import jl95.util.StrictMap;
 import jl95.util.UFuture;
 import jl95.util.UVoidFuture;
 
-public abstract class GenericRequester<A,R> implements RequesterIf<A,R> {
+public abstract class IOSRRequester<A,R> implements Requester<A,R> {
 
-    public static <A,R,C extends GenericRequester<A,R>> C of(Function1<C, SenderReceiverIf<byte[], byte[]>> constructor, SenderReceiverIf<byte[],byte[]> sr) {
+    public static <A,R,C extends IOSRRequester<A,R>> C of(Function1<C, SenderReceiver<byte[], byte[]>> constructor, SenderReceiver<byte[],byte[]> sr) {
         return constructor.apply(sr);
     }
-    public static <A,R,C extends GenericRequester<A,R>> C of(Function1<C, SenderReceiverIf<byte[], byte[]>> constructor, Ios ios) {
+    public static <A,R,C extends IOSRRequester<A,R>> C of(Function1<C, SenderReceiver<byte[], byte[]>> constructor, IOStreamSupplier ios) {
 
-        return of(constructor, SenderReceiverIf.fromIo(ios));
+        return of(constructor, SenderReceiver.fromIo(ios));
     }
-    public static <A,R,C extends GenericRequester<A,R>> C of(Function1<C, SenderReceiverIf<byte[], byte[]>> constructor, ManagedIos ios) {
+    public static <A,R,C extends IOSRRequester<A,R>> C of(Function1<C, SenderReceiver<byte[], byte[]>> constructor, ManagedIOStreamSupplier ios) {
 
-        return of(constructor, SenderReceiverIf.fromManagedIo(ios));
+        return of(constructor, SenderReceiver.fromManagedIo(ios));
     }
 
-    private final SenderIf  <byte[]> sender;
-    private final ReceiverIf<byte[]> receiver;
+    private final Sender  <byte[]> sender;
+    private final Receiver<byte[]> receiver;
     private final ThreadPoolExecutor receiverTpe;
     private final StrictMap<String, CompletableFuture<byte[]>> responseFuturesMap;
 
-    private GenericRequester(SenderIf  <byte[]> sender,
-                             ReceiverIf<byte[]> receiver,
-                             ThreadPoolExecutor receiverTpe,
-                             StrictMap<String, CompletableFuture<byte[]>> responseFuturesMap) {
+    private IOSRRequester(Sender  <byte[]> sender,
+                          Receiver<byte[]> receiver,
+                          ThreadPoolExecutor receiverTpe,
+                          StrictMap<String, CompletableFuture<byte[]>> responseFuturesMap) {
         this.sender = sender;
         this.receiver = receiver;
         this.receiverTpe = receiverTpe;
         this.responseFuturesMap = responseFuturesMap;
     }
-    public GenericRequester(SenderReceiverIf<byte[],byte[]> sr,
-                            int nrOfResponsesToWaitMax) {
+    public IOSRRequester(SenderReceiver<byte[],byte[]> sr,
+                         int nrOfResponsesToWaitMax) {
         this(sr.getSender(),
              sr.getReceiver(),
              new ScheduledThreadPoolExecutor(1),
@@ -66,19 +63,19 @@ public abstract class GenericRequester<A,R> implements RequesterIf<A,R> {
                  }
              }));
     }
-    public GenericRequester(SenderReceiverIf<byte[],byte[]> sr) {
+    public IOSRRequester(SenderReceiver<byte[],byte[]> sr) {
         this(sr, 10);
     }
     @Deprecated
-    public GenericRequester(SenderIf  <byte[]>  sender,
-                            ReceiverIf<byte[]> receiver,
-                            int nrOfResponsesToWaitMax) {
-        this(SenderReceiverIf.ofConstant(sender, receiver), nrOfResponsesToWaitMax);
+    public IOSRRequester(Sender  <byte[]>  sender,
+                         Receiver<byte[]> receiver,
+                         int nrOfResponsesToWaitMax) {
+        this(SenderReceiver.ofConstant(sender, receiver), nrOfResponsesToWaitMax);
     }
     @Deprecated
-    public GenericRequester(SenderIf  <byte[]>  sender,
-                      ReceiverIf<byte[]> receiver) {
-        this(SenderReceiverIf.ofConstant(sender, receiver));
+    public IOSRRequester(Sender  <byte[]>  sender,
+                         Receiver<byte[]> receiver) {
+        this(SenderReceiver.ofConstant(sender, receiver));
     }
 
     private UVoidFuture startReceiving() {
@@ -122,29 +119,24 @@ public abstract class GenericRequester<A,R> implements RequesterIf<A,R> {
     }
 
     @Override
-    public final InputStream  getInputStream () { return receiver.getInputStream (); }
-    @Override
-    public final OutputStream getOutputStream() { return sender  .getOutputStream(); }
-
-    @Override
-    public <A2, R2> GenericRequester<A2, R2> adapted        (Function1<A, A2> requestAdapter,
+    public <A2, R2> IOSRRequester<A2, R2> adapted        (Function1<A, A2> requestAdapter,
                                                               Function1<R2, R> responseAdapter) {
-        return new GenericRequester<>(sender, receiver, receiverTpe, responseFuturesMap) {
+        return new IOSRRequester<>(sender, receiver, receiverTpe, responseFuturesMap) {
             @Override protected byte[] serialize(A2 data) {
-                return GenericRequester.this.serialize(requestAdapter.apply(data));
+                return IOSRRequester.this.serialize(requestAdapter.apply(data));
             }
             @Override protected R2 deserialize(byte[] data) {
-                return responseAdapter.apply(GenericRequester.this.deserialize(data));
+                return responseAdapter.apply(IOSRRequester.this.deserialize(data));
             }
         };
     }
     @Override
-    public <A2>     GenericRequester<A2, R>  adaptedRequest (Function1<A, A2> requestAdapter) {
+    public <A2> IOSRRequester<A2, R> adaptedRequest (Function1<A, A2> requestAdapter) {
 
         return adapted(requestAdapter, self::apply);
     }
     @Override
-    public <R2>     GenericRequester<A, R2>  adaptedResponse(Function1<R2, R> responseAdapter) {
+    public <R2> IOSRRequester<A, R2> adaptedResponse(Function1<R2, R> responseAdapter) {
 
         return adapted(self::apply, responseAdapter);
     }

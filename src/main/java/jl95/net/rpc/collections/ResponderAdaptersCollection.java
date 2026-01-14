@@ -4,61 +4,63 @@ import static jl95.lang.SuperPowers.self;
 
 import javax.json.JsonValue;
 
-import jl95.net.rpc.ResponderIf;
+import jl95.net.rpc.Responder;
 import jl95.net.rpc.util.SerdesDefaults;
 
 public class ResponderAdaptersCollection {
 
-    public static ResponderIf<byte[]   , Void     > asPostResponder      (ResponderIf<byte[], byte[]> responder) {
+    private ResponderAdaptersCollection() {}
+
+    public static Responder<byte[]   , Void     > asPostResponder      (Responder<byte[], byte[]> responder) {
 
         return responder.adapted(
             self::apply,
             x -> new byte[0]
         );
     }
-    public static ResponderIf<Void     , byte[]   > asGetResponder       (ResponderIf<byte[], byte[]> responder) {
+    public static Responder<Void     , byte[]   > asGetResponder       (Responder<byte[], byte[]> responder) {
 
         return responder.adapted(
             x -> null,
             self::apply
         );
     }
-    public static ResponderIf<String   , String   > asStringResponder    (ResponderIf<byte[], byte[]> responder) {
+    public static Responder<String   , String   > asStringResponder    (Responder<byte[], byte[]> responder) {
 
         return responder.adapted(
             SerdesDefaults.stringFromBytes,
             SerdesDefaults.stringToBytes
         );
     }
-    public static ResponderIf<String   , Void     > asStringPostResponder(ResponderIf<byte[], byte[]> responder) {
+    public static Responder<String   , Void     > asStringPostResponder(Responder<byte[], byte[]> responder) {
 
         return asPostResponder(responder).adapted(
             SerdesDefaults.stringFromBytes,
             x -> x
         );
     }
-    public static ResponderIf<Void     , String   > asStringGetResponder (ResponderIf<byte[], byte[]> responder) {
+    public static Responder<Void     , String   > asStringGetResponder (Responder<byte[], byte[]> responder) {
 
         return asGetResponder(responder).adapted(
             x -> x,
             SerdesDefaults.stringToBytes
         );
     }
-    public static ResponderIf<JsonValue, JsonValue> asJsonResponder      (ResponderIf<byte[], byte[]> responder) {
+    public static Responder<JsonValue, JsonValue> asJsonResponder      (Responder<byte[], byte[]> responder) {
 
         return asStringResponder(responder).adapted(
             SerdesDefaults.jsonFromString,
             SerdesDefaults.jsonToString
         );
     }
-    public static ResponderIf<JsonValue, Void     > asJsonPostResponder  (ResponderIf<byte[], byte[]> responder) {
+    public static Responder<JsonValue, Void     > asJsonPostResponder  (Responder<byte[], byte[]> responder) {
 
         return asStringPostResponder(responder).adapted(
             SerdesDefaults.jsonFromString,
             x -> x
         );
     }
-    public static ResponderIf<Void     , JsonValue> asJsonGetResponder   (ResponderIf<byte[], byte[]> responder) {
+    public static Responder<Void     , JsonValue> asJsonGetResponder   (Responder<byte[], byte[]> responder) {
 
         return asStringGetResponder(responder).adapted(
             x -> x,

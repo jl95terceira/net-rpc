@@ -1,7 +1,6 @@
 package jl95.net.rpc;
 
 import static jl95.lang.SuperPowers.I;
-import static jl95.lang.SuperPowers.constant;
 import static jl95.lang.SuperPowers.self;
 import static jl95.lang.SuperPowers.sleep;
 
@@ -11,9 +10,9 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
-import jl95.net.io.CloseableIos;
-import jl95.net.io.managed.SwitchingRetriableClientIos;
-import jl95.net.io.managed.SwitchingRetriableIos;
+import jl95.net.io.CloseableIOStreamSupplier;
+import jl95.net.io.managed.SwitchingRetriableClientIOStream;
+import jl95.net.io.managed.SwitchingRetriableIOStream;
 import jl95.net.rpc.collections.RequesterAdaptersCollection;
 import jl95.net.rpc.collections.ResponderAdaptersCollection;
 
@@ -22,27 +21,27 @@ public class TestSwitchingIo {
     public static InetSocketAddress addr1 = new InetSocketAddress("127.0.0.1", 42421);
     public static InetSocketAddress addr2 = new InetSocketAddress("127.0.0.1", 42422);
 
-    SwitchingRetriableIos ioAsClient;
-    CloseableIos ioAsServer1;
-    CloseableIos ioAsServer2;
-    RequesterIf<String, String> requester;
-    ResponderIf<String, String> responder1;
-    ResponderIf<String, String> responder2;
+    SwitchingRetriableIOStream ioAsClient;
+    CloseableIOStreamSupplier ioAsServer1;
+    CloseableIOStreamSupplier ioAsServer2;
+    Requester<String, String> requester;
+    Responder<String, String> responder1;
+    Responder<String, String> responder2;
 
     @org.junit.Before
     public void setUp() throws Exception {
         var responder1Future = CompletableFuture.supplyAsync(() -> {
             ioAsServer1 = Util.getIoAsServer(addr1);
-            return ResponderAdaptersCollection.asStringResponder(Responder.of(ioAsServer1));
+            return ResponderAdaptersCollection.asStringResponder(BytesIOSRResponder.of(ioAsServer1));
         }, (task) -> new Thread(task).start());
         var responder2Future = CompletableFuture.supplyAsync(() -> {
             ioAsServer2 = Util.getIoAsServer(addr2);
-            return ResponderAdaptersCollection.asStringResponder(Responder.of(ioAsServer2));
+            return ResponderAdaptersCollection.asStringResponder(BytesIOSRResponder.of(ioAsServer2));
         }, (task) -> new Thread(task).start());
         sleep(50);
         var requesterFuture = CompletableFuture.supplyAsync(() -> {
-            ioAsClient = SwitchingRetriableClientIos.of(addr1, addr2);
-            return RequesterAdaptersCollection.asStringRequester(Requester.of(ioAsClient));
+            ioAsClient = SwitchingRetriableClientIOStream.of(addr1, addr2);
+            return RequesterAdaptersCollection.asStringRequester(BytesIOSRRequester.of(ioAsClient));
         }, (task) -> new Thread(task).start());
         requester = requesterFuture.get();
         responder1 = responder1Future.get();

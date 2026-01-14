@@ -1,53 +1,30 @@
 package jl95.net.rpc;
 
-import static jl95.lang.SuperPowers.strict;
+import static jl95.lang.SuperPowers.mapped;
+import static jl95.lang.SuperPowers.self;
 
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.util.LinkedHashMap;
-import java.util.Map;
-import java.util.UUID;
-import java.util.concurrent.*;
 
-import jl95.net.io.Ios;
-import jl95.net.io.ReceiverIf;
-import jl95.net.io.SenderIf;
-import jl95.net.io.SenderReceiverIf;
-import jl95.net.io.managed.ManagedIos;
-import jl95.serdes.StringUTF8FromBytes;
-import jl95.serdes.StringUTF8ToBytes;
-import jl95.util.StrictMap;
+import jl95.lang.variadic.*;
 import jl95.util.UFuture;
-import jl95.util.UVoidFuture;
 
-public class Requester extends GenericRequester<byte[], byte[]> {
+public interface Requester<A, R> extends Function1<UFuture<R>,A> {
 
-    public static Requester of(SenderReceiverIf<byte[], byte[]> sr) {
-        return new Requester(sr);
+    default <A2, R2> Requester<A2, R2> adapted        (Function1<A, A2> requestAdapter,
+                                                         Function1<R2, R> responseAdapter) {
+        return requestObject -> {
+            var adaptedRequestObject = requestAdapter.apply(requestObject);
+            var responseObject = Requester.this.apply(adaptedRequestObject);
+            return mapped(responseAdapter, responseObject);
+        };
     }
-    public static Requester of(Ios ios) {
-        return of(SenderReceiverIf.fromIo(ios));
-    }
-    public static Requester of(ManagedIos ios) {
-        return of(SenderReceiverIf.fromManagedIo(ios));
-    }
+    default <A2> Requester<A2, R> adaptedRequest (Function1<A, A2> requestAdapter) {
 
-    public Requester(SenderReceiverIf<byte[],byte[]> sr,
-                     int nrOfResponsesToWaitMax) {
-        super(sr, nrOfResponsesToWaitMax);
+        return adapted(requestAdapter, self::apply);
     }
-    public Requester(SenderReceiverIf<byte[],byte[]> sr) {
-        super(sr);
-    }
+    default <R2> Requester<A, R2> adaptedResponse(Function1<R2, R> responseAdapter) {
 
-    @Override
-    protected byte[] serialize(byte[] requestData) {
-        return requestData;
+        return adapted(self::apply, responseAdapter);
     }
-
-    @Override
-    protected byte[] deserialize(byte[] responseData) {
-        return responseData;
-    }
-
 }

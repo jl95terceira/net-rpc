@@ -11,14 +11,14 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 
 import jl95.net.Server;
-import jl95.net.io.CloseableIos;
+import jl95.net.io.CloseableIOStreamSupplier;
 import jl95.net.io.util.Defaults;
 import jl95.util.*;
 
 public class Util {
 
-        public static CloseableIos getIoFromSocket(Socket            socket) {
-            return new CloseableIos() {
+        public static CloseableIOStreamSupplier getIoFromSocket(Socket            socket) {
+            return new CloseableIOStreamSupplier() {
                 @Override public InputStream getInputStream() { return uncheck(socket::getInputStream); }
                 @Override public OutputStream getOutputStream() { return uncheck(socket::getOutputStream); }
                 @Override public void         close () {
@@ -28,12 +28,12 @@ public class Util {
                 }
             };
         }
-        public static CloseableIos getIoAsClient  (InetSocketAddress addr) {
+        public static CloseableIOStreamSupplier getIoAsClient  (InetSocketAddress addr) {
             var socket = new Socket();
             uncheck(() -> socket.connect(addr));
             return getIoFromSocket(socket);
         }
-        public static CloseableIos getIoAsServer  (InetSocketAddress addr,
+        public static CloseableIOStreamSupplier getIoAsServer  (InetSocketAddress addr,
                                          Optional<Integer> clientConnectionTimeoutMs) {
             var clientSocketFuture = new CompletableFuture<Socket>();
             var server = Server.fromSocket(jl95.net.Util.getSimpleServerSocket(addr, Defaults.acceptTimeoutMs));
@@ -48,5 +48,5 @@ public class Util {
             uncheck(server.getSocket()::close); // release bind address
             return getIoFromSocket(clientSocket);
         }
-        public static CloseableIos getIoAsServer  (InetSocketAddress addr) { return getIoAsServer(addr, Optional.empty()); }
+        public static CloseableIOStreamSupplier getIoAsServer  (InetSocketAddress addr) { return getIoAsServer(addr, Optional.empty()); }
 }

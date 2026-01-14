@@ -10,25 +10,25 @@ import java.util.concurrent.TimeoutException;
 
 import jl95.net.rpc.collections.RequesterAdaptersCollection;
 import jl95.net.rpc.collections.ResponderAdaptersCollection;
-import jl95.net.io.CloseableIos;
+import jl95.net.io.CloseableIOStreamSupplier;
 
 public class Test {
 
-    CloseableIos ioAsServer;
-    CloseableIos ioAsClient;
-    RequesterIf<String, String> requester;
-    ResponderIf<String, String> responder;
+    CloseableIOStreamSupplier ioAsServer;
+    CloseableIOStreamSupplier ioAsClient;
+    Requester<String, String> requester;
+    Responder<String, String> responder;
 
     @org.junit.Before
     public void setUp() throws Exception {
         var responderFuture = CompletableFuture.supplyAsync(() -> {
             ioAsServer = Util.getIoAsServer(jl95.net.io.util.Defaults.serverAddr);
-            return ResponderAdaptersCollection.asStringResponder(Responder.of(ioAsServer));
+            return ResponderAdaptersCollection.asStringResponder(BytesIOSRResponder.of(ioAsServer));
         }, (task) -> new Thread(task).start());
         sleep(50);
         var requesterFuture = CompletableFuture.supplyAsync(() -> {
             ioAsClient = Util.getIoAsClient(jl95.net.io.util.Defaults.serverAddr);
-            return RequesterAdaptersCollection.asStringRequester(Requester.of(ioAsClient));
+            return RequesterAdaptersCollection.asStringRequester(BytesIOSRRequester.of(ioAsClient));
         }, (task) -> new Thread(task).start());
         requester = requesterFuture.get();
         responder = responderFuture.get();
