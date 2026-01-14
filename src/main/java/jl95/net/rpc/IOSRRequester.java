@@ -9,10 +9,11 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
-import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 
 import jl95.lang.variadic.Function1;
+import jl95.lang.variadic.Method1;
 import jl95.net.io.IOStreamSupplier;
 import jl95.net.io.Receiver;
 import jl95.net.io.Sender;
@@ -40,18 +41,18 @@ public abstract class IOSRRequester<A,R> implements Requester<A,R> {
 
     private final Sender  <byte[]> sender;
     private final Receiver<byte[]> receiver;
-    private final ThreadPoolExecutor receiverTpe;
+    private final AtomicReference<Method1<Runnable>> receiverExecutor;
     private final StrictMap<String, CompletableFuture<byte[]>> responseFuturesMap;
     private final AtomicBoolean autoAcceptResponses;
 
     private IOSRRequester(Sender  <byte[]> sender,
                           Receiver<byte[]> receiver,
-                          ThreadPoolExecutor receiverTpe,
+                          AtomicReference<Method1<Runnable>> receiverExecutor,
                           StrictMap<String, CompletableFuture<byte[]>> responseFuturesMap,
                           AtomicBoolean autoAcceptResponses) {
         this.sender = sender;
         this.receiver = receiver;
-        this.receiverTpe = receiverTpe;
+        this.receiverExecutor = receiverExecutor;
         this.responseFuturesMap = responseFuturesMap;
         this.autoAcceptResponses = autoAcceptResponses;
     }
@@ -60,7 +61,7 @@ public abstract class IOSRRequester<A,R> implements Requester<A,R> {
                          int nrOfResponsesToWaitMax) {
         this(sr.getSender(),
              sr.getReceiver(),
-             new ScheduledThreadPoolExecutor(1),
+             new AtomicReference<>(null),
              strict(new LinkedHashMap<>() {
                  @Override
                  public boolean removeEldestEntry(Map.Entry<String, CompletableFuture<byte[]>> eldestEntry) {
@@ -84,6 +85,9 @@ public abstract class IOSRRequester<A,R> implements Requester<A,R> {
         this(SenderReceiver.ofConstant(sender, receiver));
     }
 
+    public void setResponseAcceptanceExecutor(Method1<Runnable> executor) {
+        receiverExecutor.set(executor);
+    }
     public boolean isAcceptingResponses() {
         return receiver.isReceiving();
     }
@@ -92,7 +96,10 @@ public abstract class IOSRRequester<A,R> implements Requester<A,R> {
             throw new IllegalStateException();
         }
         if (toAccept) {
-            receiverTpe.execute(() -> receiver.recvWhile(response -> {
+            if (receiverExecutor.get() == null) {
+                receiverExecutor.set(new ScheduledThreadPoolExecutor(1)::execute);
+            }
+            receiverExecutor.get().accept(() -> receiver.recvWhile(response -> {
                 //var idAsBytes = new byte[36];
                 //var id = StringUTF8FromBytes.get().apply(idAsBytes);
                 var requestIdAsBytes = new byte[36];
@@ -121,7 +128,7 @@ public abstract class IOSRRequester<A,R> implements Requester<A,R> {
     protected abstract R      deserialize(byte[] responseData);
 
     @Override
-    synchronized public final UFuture<R> apply(A data) {
+    public synchronized UFuture<R> apply(A data) {
 
         var payload = serialize(data);
         var requestId = UUID.randomUUID().toString();
@@ -141,7 +148,7 @@ public abstract class IOSRRequester<A,R> implements Requester<A,R> {
     @Override
     public <A2, R2> IOSRRequester<A2, R2> adapted(Function1<A, A2> requestAdapter,
                                                   Function1<R2, R> responseAdapter) {
-        return new IOSRRequester<>(sender, receiver, receiverTpe, responseFuturesMap, autoAcceptResponses) {
+        return new IOSRRequester<>(sender, receiver, receiverExecutor, responseFuturesMap, autoAcceptResponses) {
             @Override protected byte[] serialize(A2 data) {
                 return IOSRRequester.this.serialize(requestAdapter.apply(data));
             }

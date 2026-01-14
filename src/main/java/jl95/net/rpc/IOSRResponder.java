@@ -5,6 +5,7 @@ import static jl95.lang.SuperPowers.self;
 import java.util.UUID;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import jl95.lang.variadic.Function1;
 import jl95.lang.variadic.Tuple2;
@@ -17,9 +18,6 @@ import jl95.serdes.StringUTF8ToBytes;
 import jl95.util.UVoidFuture;
 
 public abstract class IOSRResponder<A,R> implements Responder<A, R> {
-
-    public static class StartWhenAlreadyRunningException extends RuntimeException {}
-    public static class StopWhenNotRunningException      extends RuntimeException {}
 
     public static <A, R, C extends IOSRResponder<A, R>> C of(Function1<C, SenderReceiver<byte[], byte[]>> constructor, SenderReceiver<byte[], byte[]> sr) {
         return constructor.apply(sr);
@@ -35,17 +33,18 @@ public abstract class IOSRResponder<A,R> implements Responder<A, R> {
 
     private final Receiver<byte[]> receiver;
     private final Sender  <byte[]> sender;
-    private final ThreadPoolExecutor receiverTpe;
+    private final AtomicBoolean toStop;
 
     private IOSRResponder(Receiver<byte[]> receiver,
-                          ThreadPoolExecutor receiverTpe,
-                          Sender  <byte[]> sender) {
+                          Sender  <byte[]> sender,
+                          AtomicBoolean toStop) {
         this.receiver = receiver;
-        this.receiverTpe = receiverTpe;
         this.sender   = sender;
+        this.toStop   = toStop;
     }
+
     public IOSRResponder(SenderReceiver<byte[],byte[]> sr) {
-        this(sr.getReceiver(), new ScheduledThreadPoolExecutor(1), sr.getSender());
+        this(sr.getReceiver(), sr.getSender(), new AtomicBoolean(false));
     }
     @Deprecated
     public IOSRResponder(Receiver<byte[]> receiver,
@@ -57,52 +56,57 @@ public abstract class IOSRResponder<A,R> implements Responder<A, R> {
     protected abstract byte[] serialize  (R      responseData);
 
     @Override
-    synchronized public UVoidFuture respondWhile(Function1<Tuple2<R, Boolean>, A> responseFunction,
-                                                 RespondOptions options) {
+    public synchronized void respondWhile(Function1<Tuple2<R, Boolean>, A> responseFunction,
+                                          RespondOptions options) {
 
         if (isRunning()) {
-            throw new StartWhenAlreadyRunningException();
+            throw new IllegalStateException();
         }
-        receiverTpe.execute(() -> receiver.recvWhile(request -> {
-
+        toStop.set(false);
+        receiver.recvWhile(request -> {
             var requestIdAsBytes = new byte[36];
             //var id = StringUTF8FromBytes.get().apply(idAsBytes);
             var requestPayload = new byte[request.length-36];
             System.arraycopy(request,  0, requestIdAsBytes, 0,                36);
             System.arraycopy(request, 36, requestPayload,   0, request.length-36);
-            var object = responseFunction.apply(deserialize(requestPayload));
-            var responsePayload = serialize(object.a1);
-            try {
-                var response = new byte[72+responsePayload.length];
-                var responseIdAsBytes = StringUTF8ToBytes.get().apply(UUID.randomUUID().toString());
-                System.arraycopy(responseIdAsBytes, 0, response,  0,  36);
-                System.arraycopy(requestIdAsBytes,  0, response,  36, 36);
-                System.arraycopy(responsePayload,   0, response,  72, responsePayload.length);
-                sender.send(response);
-            }
-            catch (Exception ex) {
-                return true; // continue receiving
-            }
-            return object.a2;
-        }, options));
+            var responseAndToContinue = responseFunction.apply(deserialize(requestPayload));
+            var responsePayload = serialize(responseAndToContinue.a1);
+            var response = new byte[72+responsePayload.length];
+            var responseIdAsBytes = StringUTF8ToBytes.get().apply(UUID.randomUUID().toString());
+            System.arraycopy(responseIdAsBytes, 0, response,  0,  36);
+            System.arraycopy(requestIdAsBytes,  0, response,  36, 36);
+            System.arraycopy(responsePayload,   0, response,  72, responsePayload.length);
+            sender.send(response);
+            return responseAndToContinue.a2;
+        }, options);
+    }
+    @Override
+    public UVoidFuture waitRespondingStarted() {
+
         return receiver.recvWaitStarted();
     }
     @Override
-    synchronized public UVoidFuture stop() {
+    public UVoidFuture stop() {
 
-        if (!isRunning()) throw new StopWhenNotRunningException();
+        if (!isRunning()) {
+            throw new IllegalStateException();
+        }
         return receiver.recvStop();
+    }
+    @Override
+    public UVoidFuture waitRespondingStopped() {
+        return receiver.recvWaitStopped();
     }
 
     @Override
-    public Boolean isRunning() {
+    public boolean isRunning() {
 
         return receiver.isReceiving();
     }
 
-    public <A2, R2> Responder<A2, R2> adapted        (Function1<A2, A> requestAdapter,
-                                                        Function1<R, R2> responseAdapter) {
-        return new IOSRResponder<>(receiver, receiverTpe, sender) {
+    public <A2, R2> Responder<A2, R2> adapted(Function1<A2, A> requestAdapter,
+                                              Function1<R, R2> responseAdapter) {
+        return new IOSRResponder<>(receiver, sender, toStop) {
             @Override protected A2 deserialize(byte[] requestData) {
                 return requestAdapter.apply(IOSRResponder.this.deserialize(requestData));
             }
