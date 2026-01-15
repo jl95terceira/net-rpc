@@ -3,32 +3,32 @@ package jl95.net.rpc;
 import static jl95.lang.SuperPowers.self;
 
 import java.util.UUID;
-import java.util.concurrent.ScheduledThreadPoolExecutor;
-import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import jl95.lang.variadic.Function1;
+import jl95.lang.variadic.Function2;
 import jl95.lang.variadic.Tuple2;
+import jl95.net.io.BytesIStreamReceiver;
+import jl95.net.io.BytesOStreamSender;
 import jl95.net.io.IOStreamSupplier;
 import jl95.net.io.Receiver;
 import jl95.net.io.Sender;
-import jl95.net.io.SenderReceiver;
 import jl95.net.io.managed.ManagedIOStreamSupplier;
 import jl95.serdes.StringUTF8ToBytes;
 import jl95.util.UVoidFuture;
 
 public abstract class IOSRResponder<A,R> implements Responder<A, R> {
 
-    public static <A, R, C extends IOSRResponder<A, R>> C of(Function1<C, SenderReceiver<byte[], byte[]>> constructor, SenderReceiver<byte[], byte[]> sr) {
-        return constructor.apply(sr);
+    public static <A, R, C extends IOSRResponder<A, R>> C of(Function2<C, Sender<byte[]>, Receiver<byte[]>> constructor, Sender<byte[]> sender, Receiver<byte[]> receiver) {
+        return constructor.apply(sender, receiver);
     }
-    public static <A, R, C extends IOSRResponder<A, R>> C of(Function1<C, SenderReceiver<byte[], byte[]>> constructor, IOStreamSupplier ios) {
+    public static <A, R, C extends IOSRResponder<A, R>> C of(Function2<C, Sender<byte[]>, Receiver<byte[]>> constructor, IOStreamSupplier ios) {
 
-        return of(constructor, SenderReceiver.fromIo(ios));
+        return of(constructor, BytesOStreamSender.of(ios.getOutputStream()), BytesIStreamReceiver.of(ios.getInputStream()));
     }
-    public static <A, R, C extends IOSRResponder<A, R>> C of(Function1<C, SenderReceiver<byte[], byte[]>> constructor, ManagedIOStreamSupplier ios) {
+    public static <A, R, C extends IOSRResponder<A, R>> C of(Function2<C, Sender<byte[]>, Receiver<byte[]>> constructor, ManagedIOStreamSupplier mios) {
 
-        return of(constructor, SenderReceiver.fromManagedIo(ios));
+        return of(constructor, BytesOStreamSender.of(mios), BytesIStreamReceiver.of(mios));
     }
 
     private final Receiver<byte[]> receiver;
@@ -43,13 +43,9 @@ public abstract class IOSRResponder<A,R> implements Responder<A, R> {
         this.toStop   = toStop;
     }
 
-    public IOSRResponder(SenderReceiver<byte[],byte[]> sr) {
-        this(sr.getReceiver(), sr.getSender(), new AtomicBoolean(false));
-    }
-    @Deprecated
     public IOSRResponder(Receiver<byte[]> receiver,
                          Sender  <byte[]> sender) {
-        this(SenderReceiver.ofConstant(sender,receiver));
+        this(receiver, sender, new AtomicBoolean(false));
     }
 
     protected abstract A      deserialize(byte[] requestData);

@@ -13,11 +13,13 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
 import jl95.lang.variadic.Function1;
+import jl95.lang.variadic.Function2;
 import jl95.lang.variadic.Method1;
+import jl95.net.io.BytesIStreamReceiver;
+import jl95.net.io.BytesOStreamSender;
 import jl95.net.io.IOStreamSupplier;
 import jl95.net.io.Receiver;
 import jl95.net.io.Sender;
-import jl95.net.io.SenderReceiver;
 import jl95.net.io.managed.ManagedIOStreamSupplier;
 import jl95.serdes.StringUTF8FromBytes;
 import jl95.serdes.StringUTF8ToBytes;
@@ -27,16 +29,16 @@ import jl95.util.UVoidFuture;
 
 public abstract class IOSRRequester<A,R> implements Requester<A,R> {
 
-    public static <A,R,C extends IOSRRequester<A,R>> C of(Function1<C, SenderReceiver<byte[], byte[]>> constructor, SenderReceiver<byte[],byte[]> sr) {
-        return constructor.apply(sr);
+    public static <A,R,C extends IOSRRequester<A,R>> C of(Function2<C, Sender<byte[]>, Receiver<byte[]>> constructor, Sender<byte[]> sender, Receiver<byte[]> receiver) {
+        return constructor.apply(sender, receiver);
     }
-    public static <A,R,C extends IOSRRequester<A,R>> C of(Function1<C, SenderReceiver<byte[], byte[]>> constructor, IOStreamSupplier ios) {
+    public static <A,R,C extends IOSRRequester<A,R>> C of(Function2<C, Sender<byte[]>, Receiver<byte[]>> constructor, IOStreamSupplier ios) {
 
-        return of(constructor, SenderReceiver.fromIo(ios));
+        return of(constructor, BytesOStreamSender.of(ios.getOutputStream()), BytesIStreamReceiver.of(ios.getInputStream()));
     }
-    public static <A,R,C extends IOSRRequester<A,R>> C of(Function1<C, SenderReceiver<byte[], byte[]>> constructor, ManagedIOStreamSupplier ios) {
+    public static <A,R,C extends IOSRRequester<A,R>> C of(Function2<C, Sender<byte[]>, Receiver<byte[]>> constructor, ManagedIOStreamSupplier mios) {
 
-        return of(constructor, SenderReceiver.fromManagedIo(ios));
+        return of(constructor, BytesOStreamSender.of(mios), BytesIStreamReceiver.of(mios));
     }
 
     private final Sender  <byte[]> sender;
@@ -57,10 +59,10 @@ public abstract class IOSRRequester<A,R> implements Requester<A,R> {
         this.autoAcceptResponses = autoAcceptResponses;
     }
 
-    public IOSRRequester(SenderReceiver<byte[],byte[]> sr,
+    public IOSRRequester(Sender<byte[]> sender, Receiver<byte[]> receiver,
                          int nrOfResponsesToWaitMax) {
-        this(sr.getSender(),
-             sr.getReceiver(),
+        this(sender,
+             receiver,
              new AtomicReference<>(null),
              strict(new LinkedHashMap<>() {
                  @Override
@@ -70,19 +72,8 @@ public abstract class IOSRRequester<A,R> implements Requester<A,R> {
              }),
              new AtomicBoolean(true));
     }
-    public IOSRRequester(SenderReceiver<byte[],byte[]> sr) {
-        this(sr, 10);
-    }
-    @Deprecated
-    public IOSRRequester(Sender  <byte[]>  sender,
-                         Receiver<byte[]> receiver,
-                         int nrOfResponsesToWaitMax) {
-        this(SenderReceiver.ofConstant(sender, receiver), nrOfResponsesToWaitMax);
-    }
-    @Deprecated
-    public IOSRRequester(Sender  <byte[]>  sender,
-                         Receiver<byte[]> receiver) {
-        this(SenderReceiver.ofConstant(sender, receiver));
+    public IOSRRequester(Sender<byte[]> sender, Receiver<byte[]> receiver) {
+        this(sender, receiver, 10);
     }
 
     public void setResponseAcceptanceExecutor(Method1<Runnable> executor) {
