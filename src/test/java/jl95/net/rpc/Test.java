@@ -13,12 +13,9 @@ import org.junit.Assert;
 import jl95.lang.I;
 import jl95.net.rpc.collections.RequesterAdaptersCollection;
 import jl95.net.rpc.collections.ResponderAdaptersCollection;
-import jl95.net.io.CloseableIOStreamSupplier;
 
 public class Test {
 
-    CloseableIOStreamSupplier ioAsServer;
-    CloseableIOStreamSupplier ioAsClient;
     Requester<String, String> requester;
     Responder<String, String> responder;
 
@@ -26,7 +23,7 @@ public class Test {
     public void setUp() throws Exception {
         System.out.println("set up");
         var responderFuture = CompletableFuture.supplyAsync(() -> {
-            ioAsServer = getIoAsServer(jl95.net.io.util.Defaults.serverAddr);
+            var ioAsServer = getIoAsServer(jl95.net.io.util.Defaults.serverAddr);
             return ResponderAdaptersCollection.asStringResponder(BytesIOSRResponder.of(ioAsServer))
                     .adaptedRequest((String s) -> {
                         System.out.println("Got request: "+s);
@@ -39,7 +36,7 @@ public class Test {
         }, (task) -> new Thread(task).start());
         sleep(50);
         var requesterFuture = CompletableFuture.supplyAsync(() -> {
-            ioAsClient = getIoAsClient(jl95.net.io.util.Defaults.serverAddr);
+            var ioAsClient = getIoAsClient(jl95.net.io.util.Defaults.serverAddr);
             return RequesterAdaptersCollection.asStringRequester(BytesIOSRRequester.of(ioAsClient))
                     .adaptedRequest((String s) -> {
                         System.out.println("Requesting: "+s);
@@ -56,13 +53,15 @@ public class Test {
     @org.junit.After
     public void tearDown() {
         System.out.println("tear down");
-        if (responder.isRunning()) {
-            responder.stop()
-                    .get(3, SECONDS);
+        if (responder != null) {
+            responder.ensureStopped();
+            responder.close();
         }
-        System.out.println("responder stopped");
-        if (ioAsClient != null) ioAsClient.close();
-        if (ioAsServer != null) ioAsServer.close();
+        System.out.println("responder closed");
+        if (requester != null) {
+            requester.close();
+        }
+        System.out.println("requester closed");
     }
 
     public static void threaded(Runnable r) {
