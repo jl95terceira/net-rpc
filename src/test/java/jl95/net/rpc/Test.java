@@ -2,6 +2,8 @@ package jl95.net.rpc;
 
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static jl95.lang.SuperPowers.*;
+import static jl95.net.io.Util.getIoAsClient;
+import static jl95.net.io.Util.getIoAsServer;
 
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
@@ -24,7 +26,7 @@ public class Test {
     public void setUp() throws Exception {
         System.out.println("set up");
         var responderFuture = CompletableFuture.supplyAsync(() -> {
-            ioAsServer = Util.getIoAsServer(jl95.net.io.util.Defaults.serverAddr);
+            ioAsServer = getIoAsServer(jl95.net.io.util.Defaults.serverAddr);
             return ResponderAdaptersCollection.asStringResponder(BytesIOSRResponder.of(ioAsServer))
                     .adaptedRequest((String s) -> {
                         System.out.println("Got request: "+s);
@@ -37,7 +39,7 @@ public class Test {
         }, (task) -> new Thread(task).start());
         sleep(50);
         var requesterFuture = CompletableFuture.supplyAsync(() -> {
-            ioAsClient = Util.getIoAsClient(jl95.net.io.util.Defaults.serverAddr);
+            ioAsClient = getIoAsClient(jl95.net.io.util.Defaults.serverAddr);
             return RequesterAdaptersCollection.asStringRequester(BytesIOSRRequester.of(ioAsClient))
                     .adaptedRequest((String s) -> {
                         System.out.println("Requesting: "+s);

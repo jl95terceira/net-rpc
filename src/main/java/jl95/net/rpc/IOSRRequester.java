@@ -158,4 +158,13 @@ public abstract class IOSRRequester<A,R> implements Requester<A,R> {
 
         return adapted(self::apply, responseAdapter);
     }
+
+    @Override
+    public void close() {
+        sender.close();
+        if (isAcceptingResponses()) {
+            acceptResponses(false).get();
+        }
+        receiver.close();
+    }
 }

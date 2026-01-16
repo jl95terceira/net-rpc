@@ -4,6 +4,7 @@ import static jl95.lang.SuperPowers.I;
 import static jl95.lang.SuperPowers.self;
 import static jl95.lang.SuperPowers.sleep;
 import static jl95.lang.SuperPowers.tuple;
+import static jl95.net.io.Util.getIoAsServer;
 import static jl95.net.rpc.Test.threaded;
 
 import java.net.InetSocketAddress;
@@ -36,11 +37,11 @@ public class TestSwitchingIo {
     @org.junit.Before
     public void setUp() throws Exception {
         var responder1Future = CompletableFuture.supplyAsync(() -> {
-            ioAsServer1 = Util.getIoAsServer(addr1);
+            ioAsServer1 = getIoAsServer(addr1);
             return ResponderAdaptersCollection.asStringResponder(BytesIOSRResponder.of(ioAsServer1));
         }, (task) -> new Thread(task).start());
         var responder2Future = CompletableFuture.supplyAsync(() -> {
-            ioAsServer2 = Util.getIoAsServer(addr2);
+            ioAsServer2 = getIoAsServer(addr2);
             return ResponderAdaptersCollection.asStringResponder(BytesIOSRResponder.of(ioAsServer2));
         }, (task) -> new Thread(task).start());
         sleep(50);
@@ -128,7 +129,7 @@ public class TestSwitchingIo {
         // switch to responder 2
         org.junit.Assert.assertEquals("2:test2", requester.apply("test2").get(3, TimeUnit.SECONDS));
         var responder1Future = CompletableFuture.supplyAsync(() -> {
-            ioAsServer1 = Util.getIoAsServer(addr1);
+            ioAsServer1 = getIoAsServer(addr1);
             return ResponderAdaptersCollection.asStringResponder(BytesIOSRResponder.of(ioAsServer1));
         }, (task) -> new Thread(task).start());
         responder1 = UFuture.of(responder1Future).get();

@@ -5,10 +5,11 @@ import static jl95.lang.SuperPowers.tuple;
 
 import jl95.lang.variadic.Function1;
 import jl95.lang.variadic.Tuple2;
+import jl95.net.io.Closeable;
 import jl95.net.io.Receiver;
 import jl95.util.*;
 
-public interface Responder<A, R> {
+public interface Responder<A, R> extends Closeable {
 
     interface RespondOptions extends Receiver.RecvOptions {
 
@@ -51,6 +52,9 @@ public interface Responder<A, R> {
                                                Function1<R, R2> responseAdapter) {
         return new Responder<>() {
 
+            @Override public void close() {
+                Responder.this.close();
+            }
             @Override public void        respondWhile(Function1<Tuple2<R2, Boolean>, A2> responseFunction,
                                                       RespondOptions                     options) {
                 Responder.this.respondWhile(request -> {

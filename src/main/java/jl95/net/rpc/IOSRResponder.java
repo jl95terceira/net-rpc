@@ -100,6 +100,7 @@ public abstract class IOSRResponder<A,R> implements Responder<A, R> {
         return receiver.isReceiving();
     }
 
+    @Override
     public <A2, R2> Responder<A2, R2> adapted(Function1<A2, A> requestAdapter,
                                               Function1<R, R2> responseAdapter) {
         return new IOSRResponder<>(receiver, sender, toStop) {
@@ -111,12 +112,20 @@ public abstract class IOSRResponder<A,R> implements Responder<A, R> {
             }
         };
     }
+    @Override
     public <A2> Responder<A2, R> adaptedRequest (Function1<A2, A> requestAdapter) {
 
         return adapted(requestAdapter, self::apply);
     }
+    @Override
     public <R2> Responder<A, R2> adaptedResponse(Function1<R, R2> responseAdapter) {
 
         return adapted(self::apply, responseAdapter);
+    }
+    @Override
+    public void close() {
+        ensureStopped();
+        receiver.close();
+        sender.close();
     }
 }
