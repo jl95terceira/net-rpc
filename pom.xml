@@ -6,7 +6,7 @@
 
     <groupId>jl95terceira</groupId>
     <artifactId>net-rpc</artifactId>
-    <version>1.11.0</version>
+    <version>1.12.0</version>
     <packaging>jar</packaging>
 
     <dependencies>
