@@ -47,7 +47,7 @@ public abstract class IOSRRequester<A,R> implements Requester<A,R> {
     private final StrictMap<String, CompletableFuture<byte[]>> responseFuturesMap;
     private final AtomicBoolean autoAcceptResponses;
 
-    private IOSRRequester(Sender  <byte[]> sender,
+    protected IOSRRequester(Sender  <byte[]> sender,
                           Receiver<byte[]> receiver,
                           AtomicReference<Method1<Runnable>> receiverExecutor,
                           StrictMap<String, CompletableFuture<byte[]>> responseFuturesMap,

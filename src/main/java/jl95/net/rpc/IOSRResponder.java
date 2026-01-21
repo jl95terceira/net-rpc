@@ -35,7 +35,7 @@ public abstract class IOSRResponder<A,R> implements Responder<A, R> {
     private final Sender  <byte[]> sender;
     private final AtomicBoolean toStop;
 
-    private IOSRResponder(Receiver<byte[]> receiver,
+    protected IOSRResponder(Receiver<byte[]> receiver,
                           Sender  <byte[]> sender,
                           AtomicBoolean toStop) {
         this.receiver = receiver;
