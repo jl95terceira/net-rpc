@@ -18,9 +18,9 @@ import jl95.lang.variadic.Method1;
 import jl95.net.io.BytesIStreamReceiver;
 import jl95.net.io.BytesOStreamSender;
 import jl95.net.io.IOStreamSupplier;
+import jl95.net.io.ManagedIOStream;
 import jl95.net.io.Receiver;
 import jl95.net.io.Sender;
-import jl95.net.io.managed.ManagedIOStreamSupplier;
 import jl95.serdes.StringUTF8FromBytes;
 import jl95.serdes.StringUTF8ToBytes;
 import jl95.util.StrictMap;
@@ -36,9 +36,9 @@ public abstract class IOSRRequester<A,R> implements Requester<A,R> {
 
         return of(constructor, BytesOStreamSender.of(ios.getOutputStream()), BytesIStreamReceiver.of(ios.getInputStream()));
     }
-    public static <A,R,C extends IOSRRequester<A,R>> C of(Function2<C, Sender<byte[]>, Receiver<byte[]>> constructor, ManagedIOStreamSupplier mios) {
+    public static <A,R,C extends IOSRRequester<A,R>> C of(Function2<C, Sender<byte[]>, Receiver<byte[]>> constructor, ManagedIOStream mios) {
 
-        return of(constructor, BytesOStreamSender.of(mios), BytesIStreamReceiver.of(mios));
+        return of(constructor, BytesOStreamSender.of(mios.output()), BytesIStreamReceiver.of(mios.input()));
     }
 
     private final Sender  <byte[]> sender;

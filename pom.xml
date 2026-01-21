@@ -19,7 +19,7 @@
         <dependency>
             <groupId>jl95terceira</groupId>
             <artifactId>net-io</artifactId>
-            <version>1.11.0</version>
+            <version>1.12.0</version>
         </dependency>
     </dependencies>
 

@@ -3,9 +3,9 @@ package jl95.net.rpc;
 import jl95.net.io.BytesIStreamReceiver;
 import jl95.net.io.BytesOStreamSender;
 import jl95.net.io.IOStreamSupplier;
+import jl95.net.io.ManagedIOStream;
 import jl95.net.io.Receiver;
 import jl95.net.io.Sender;
-import jl95.net.io.managed.ManagedIOStreamSupplier;
 
 public class BytesIOSRRequester extends IOSRRequester<byte[], byte[]> {
 
@@ -15,8 +15,8 @@ public class BytesIOSRRequester extends IOSRRequester<byte[], byte[]> {
     public static BytesIOSRRequester of(IOStreamSupplier ios) {
         return of(BytesOStreamSender.of(ios.getOutputStream()), BytesIStreamReceiver.of(ios.getInputStream()));
     }
-    public static BytesIOSRRequester of(ManagedIOStreamSupplier mios) {
-        return of(BytesOStreamSender.of(mios), BytesIStreamReceiver.of(mios));
+    public static BytesIOSRRequester of(ManagedIOStream mios) {
+        return of(BytesOStreamSender.of(mios.output()), BytesIStreamReceiver.of(mios.input()));
     }
 
     public BytesIOSRRequester(Sender<byte[]> sender, Receiver<byte[]> receiver,
