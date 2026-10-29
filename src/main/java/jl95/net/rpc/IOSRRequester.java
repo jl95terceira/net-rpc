@@ -59,6 +59,7 @@ public abstract class IOSRRequester<A,R> implements Requester<A,R> {
         this.autoAcceptResponses = autoAcceptResponses;
     }
 
+    @Deprecated
     public IOSRRequester(Sender<byte[]> sender, Receiver<byte[]> receiver,
                          int nrOfResponsesToWaitMax) {
         this(sender,
@@ -72,6 +73,7 @@ public abstract class IOSRRequester<A,R> implements Requester<A,R> {
              }),
              new AtomicBoolean(true));
     }
+    @Deprecated
     public IOSRRequester(Sender<byte[]> sender, Receiver<byte[]> receiver) {
         this(sender, receiver, 10);
     }

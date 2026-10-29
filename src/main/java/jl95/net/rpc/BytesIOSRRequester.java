@@ -19,10 +19,12 @@ public class BytesIOSRRequester extends IOSRRequester<byte[], byte[]> {
         return of(BytesOStreamSender.of(mios.output()), BytesIStreamReceiver.of(mios.input()));
     }
 
+    @Deprecated
     public BytesIOSRRequester(Sender<byte[]> sender, Receiver<byte[]> receiver,
                               int nrOfResponsesToWaitMax) {
         super(sender, receiver, nrOfResponsesToWaitMax);
     }
+    @Deprecated
     public BytesIOSRRequester(Sender<byte[]> sender,Receiver<byte[]> receiver) {
         super(sender, receiver);
     }
